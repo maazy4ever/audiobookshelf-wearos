@@ -1,0 +1,19 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.DS_Store
+captures/
+.kotlin/
+
+# Windows-Companion
+companion-windows/**/bin/
+companion-windows/**/obj/
+companion-windows/publish/
+*.user
+.vs/
+
+# Build-Ausgaben
+*.apk
+*.aab
