@@ -13,7 +13,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - uses: android-actions/setup-android@v3
+      # Android SDK ist auf ubuntu-latest vorinstalliert (ANDROID_HOME)
       - uses: gradle/actions/setup-gradle@v4
       - run: ./gradlew assembleDebug --no-daemon
       - uses: actions/upload-artifact@v4
