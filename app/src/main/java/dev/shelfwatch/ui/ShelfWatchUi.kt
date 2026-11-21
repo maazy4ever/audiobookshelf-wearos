@@ -23,6 +23,8 @@ import androidx.wear.compose.material.Text
 import androidx.wear.compose.navigation.SwipeDismissableNavHost
 import androidx.wear.compose.navigation.composable
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
+import dev.shelfwatch.R
+import dev.shelfwatch.str
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -92,7 +94,7 @@ fun AmbientOverlay(vm: MainViewModel) {
             val posSec = ps.positionMs / 1000.0
             val remainingMin = ((item.duration - posSec) / 60).toLong().coerceAtLeast(0)
             Text(
-                (if (ps.playWhenReady) "▶ " else "❚❚ ") + "noch ${remainingMin / 60} h ${remainingMin % 60} min",
+                (if (ps.playWhenReady) "▶ " else "❚❚ ") + str(R.string.time_left, (remainingMin / 60).toInt(), (remainingMin % 60).toInt()),
                 color = Color.Gray,
                 style = MaterialTheme.typography.caption2,
             )

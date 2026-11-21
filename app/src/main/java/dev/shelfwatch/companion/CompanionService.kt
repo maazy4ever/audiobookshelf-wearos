@@ -21,6 +21,7 @@ import androidx.wear.ongoing.OngoingActivity
 import androidx.wear.ongoing.Status
 import dev.shelfwatch.Graph
 import dev.shelfwatch.R
+import dev.shelfwatch.str
 import dev.shelfwatch.download.DownloadService
 import dev.shelfwatch.ui.MainActivity
 import kotlinx.coroutines.CompletableDeferred
@@ -80,7 +81,7 @@ class CompanionService : Service() {
             try {
                 ContextCompat.startForegroundService(ctx, Intent(ctx, CompanionService::class.java))
             } catch (e: Exception) {
-                _info.value = Info(error = "Start nicht möglich: ${e.message}")
+                _info.value = Info(error = str(R.string.err_start, e.message.orEmpty()))
             }
         }
 
@@ -109,18 +110,18 @@ class CompanionService : Service() {
     override fun onCreate() {
         super.onCreate()
         getSystemService(NotificationManager::class.java).createNotificationChannel(
-            NotificationChannel(CHANNEL, "PC-Verbindung", NotificationManager.IMPORTANCE_LOW)
+            NotificationChannel(CHANNEL, str(R.string.pc_connection), NotificationManager.IMPORTANCE_LOW)
         )
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         try {
             ServiceCompat.startForeground(
-                this, NOTIF_ID, notification("Wird gestartet…"),
+                this, NOTIF_ID, notification(str(R.string.starting)),
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
             )
         } catch (e: Exception) {
-            _info.value = Info(error = "Start nicht möglich: ${e.message}")
+            _info.value = Info(error = str(R.string.err_start, e.message.orEmpty()))
             stopSelf()
             return START_NOT_STICKY
         }
@@ -156,7 +157,7 @@ class CompanionService : Service() {
                 ?.hostAddress
         }
         if (ip == null) {
-            fail("Kein WLAN – bitte auf der Uhr ein WLAN einrichten")
+            fail(str(R.string.err_no_wifi))
             return
         }
         val ss = try {
@@ -165,7 +166,7 @@ class CompanionService : Service() {
                 bind(InetSocketAddress(TCP_PORT))
             }
         } catch (e: IOException) {
-            fail("Port $TCP_PORT nicht verfügbar: ${e.message}")
+            fail(str(R.string.err_port, TCP_PORT, e.message.orEmpty()))
             return
         }
         serverSocket = ss
@@ -257,7 +258,7 @@ class CompanionService : Service() {
         )
         val builder = NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_computer)
-            .setContentTitle("PC-Verbindung aktiv")
+            .setContentTitle(str(R.string.pc_connection_active))
             .setContentText(text)
             .setOngoing(true)
             .setSilent(true)

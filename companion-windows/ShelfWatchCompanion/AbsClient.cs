@@ -72,7 +72,7 @@ public class AbsClient
             catch (AbsException) { throw; }
             catch (Exception e) { last = e; }
         }
-        throw new AbsException($"Server nicht erreichbar: {last?.Message}");
+        throw new AbsException(L.ServerUnreachable(last?.Message));
     }
 
     private async Task DoLogin(string server, string user, string password)
@@ -83,20 +83,20 @@ public class AbsClient
         };
         req.Headers.Add("x-return-tokens", "true");
         using var resp = await _http.SendAsync(req);
-        if (resp.StatusCode == HttpStatusCode.Unauthorized) throw new AbsException("Benutzername oder Passwort falsch");
-        if (!resp.IsSuccessStatusCode) throw new AbsException($"Anmeldung fehlgeschlagen: HTTP {(int)resp.StatusCode}");
+        if (resp.StatusCode == HttpStatusCode.Unauthorized) throw new AbsException(L.BadCredentials);
+        if (!resp.IsSuccessStatusCode) throw new AbsException(L.SignInFailed((int)resp.StatusCode));
         using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
         var u = doc.RootElement.GetProperty("user");
         string? token = null;
         if (u.TryGetProperty("accessToken", out var at) && at.ValueKind == JsonValueKind.String) token = at.GetString();
         if (token == null && u.TryGetProperty("token", out var t) && t.ValueKind == JsonValueKind.String) token = t.GetString();
-        if (token == null) throw new AbsException("Kein Token erhalten");
+        if (token == null) throw new AbsException(L.NoToken);
         _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
     }
 
     private async Task<JsonDocument> Get(string path)
     {
-        if (!IsLoggedIn) throw new AbsException("Nicht angemeldet");
+        if (!IsLoggedIn) throw new AbsException(L.NotSignedInAbs);
         var resp = await _http.GetAsync(Server + path);
         if (resp.StatusCode == HttpStatusCode.Unauthorized && _password != "")
         {
@@ -107,7 +107,7 @@ public class AbsClient
         }
         using (resp)
         {
-            if (!resp.IsSuccessStatusCode) throw new AbsException($"HTTP {(int)resp.StatusCode} bei {path}");
+            if (!resp.IsSuccessStatusCode) throw new AbsException($"HTTP {(int)resp.StatusCode}: {path}");
             return JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
         }
     }

@@ -1,8 +1,17 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
+}
+
+// Release-Signierung aus keystore.properties (nicht im Repository). Fehlt die Datei,
+// wird mit dem Debug-Key signiert (z. B. für eigene Builds oder CI).
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
 }
 
 android {
@@ -19,11 +28,22 @@ android {
         buildConfigField("String", "DEFAULT_SERVER", "\"$server\"")
     }
 
+    signingConfigs {
+        if (!keystoreProps.isEmpty) {
+            create("release") {
+                storeFile = rootProject.file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Zum Sideloaden mit dem Debug-Key signieren
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (!keystoreProps.isEmpty) signingConfigs.getByName("release")
+            else signingConfigs.getByName("debug")
         }
     }
     buildFeatures {

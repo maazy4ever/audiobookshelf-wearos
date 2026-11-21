@@ -67,11 +67,11 @@ public static class Fmt
 
     public static string Status(WatchDownload d) => d.Status switch
     {
-        "complete" => "Auf der Uhr ✓",
-        "queued" => "Wartet",
-        "running" => "Lädt…",
-        "waiting" => "Warte auf Netz",
-        "failed" => "Fehler: " + (d.Error ?? "unbekannt"),
-        _ => "Unvollständig",
+        "complete" => L.StComplete,
+        "queued" => L.StQueued,
+        "running" => L.StRunning,
+        "waiting" => L.StWaiting,
+        "failed" => L.StFailed(d.Error),
+        _ => L.StIncomplete,
     };
 }

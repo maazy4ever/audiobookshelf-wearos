@@ -23,6 +23,7 @@ import androidx.wear.ongoing.OngoingActivity
 import androidx.wear.ongoing.Status
 import dev.shelfwatch.Graph
 import dev.shelfwatch.R
+import dev.shelfwatch.str
 import dev.shelfwatch.data.ApiException
 import dev.shelfwatch.data.await
 import dev.shelfwatch.ui.MainActivity
@@ -134,13 +135,13 @@ class DownloadService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        nm.createNotificationChannel(NotificationChannel(CHANNEL, "Downloads", NotificationManager.IMPORTANCE_LOW))
+        nm.createNotificationChannel(NotificationChannel(CHANNEL, str(R.string.downloads), NotificationManager.IMPORTANCE_LOW))
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         try {
             ServiceCompat.startForeground(
-                this, NOTIF_ID, notification("Download wird vorbereitet…", null),
+                this, NOTIF_ID, notification(str(R.string.dl_preparing), null),
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
             )
         } catch (e: Exception) {
@@ -175,7 +176,7 @@ class DownloadService : Service() {
         worker?.cancel()
         _state.update { m ->
             m.mapValues { (_, s) ->
-                s.copy(status = DlState.Status.FAILED, error = "Zeitlimit erreicht – wird später fortgesetzt")
+                s.copy(status = DlState.Status.FAILED, error = str(R.string.dl_time_limit))
             }
         }
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
@@ -219,10 +220,10 @@ class DownloadService : Service() {
         setState(id, DlState(DlState.Status.RUNNING, 0f))
         try {
             val li = withNetworkRetry(id) { api.item(id) }
-            val media = li.media ?: throw IOException("Kein Medium gefunden")
+            val media = li.media ?: throw IOException(str(R.string.err_no_media))
             val files = media.audioFiles.filter { !it.exclude }.sortedBy { it.index }
-            if (files.isEmpty()) throw IOException("Keine Audiodateien (Podcasts werden nicht unterstützt)")
-            val title = media.metadata.title ?: "Hörbuch"
+            if (files.isEmpty()) throw IOException(str(R.string.err_no_audio))
+            val title = media.metadata.title ?: str(R.string.audiobook)
             val tracks = files.map {
                 LocalTrack(
                     index = it.index,
@@ -270,7 +271,7 @@ class DownloadService : Service() {
                 NOTIF_DONE_ID,
                 NotificationCompat.Builder(this, CHANNEL)
                     .setSmallIcon(R.drawable.ic_book)
-                    .setContentTitle("Download fertig")
+                    .setContentTitle(str(R.string.dl_done))
                     .setContentText(title)
                     .setAutoCancel(true)
                     .build(),
@@ -356,7 +357,7 @@ class DownloadService : Service() {
 
     private suspend fun waitForNetwork(id: String, attempt: Int) {
         _state.update { m -> m[id]?.let { m + (id to it.copy(waitingForNetwork = true)) } ?: m }
-        nm.notify(NOTIF_ID, notification("Warte auf Verbindung…", null))
+        nm.notify(NOTIF_ID, notification(str(R.string.dl_waiting_connection), null))
         awaitInternet(5 * 60_000L)
         delay((2_000L * attempt).coerceAtMost(30_000L))
         _state.update { m -> m[id]?.let { m + (id to it.copy(waitingForNetwork = false)) } ?: m }
@@ -480,11 +481,11 @@ class DownloadService : Service() {
                     }
                 }
                 if (target.exists()) target.delete()
-                if (!part.renameTo(target)) throw IOException("Datei konnte nicht gespeichert werden")
+                if (!part.renameTo(target)) throw IOException(str(R.string.err_save_file))
                 return@withContext
             }
         }
-        throw ApiException(lastCode, "Kein Zugriff auf Datei")
+        throw ApiException(lastCode, str(R.string.err_file_access))
     }
 
     private fun reportProgress(id: String, title: String, fraction: Float, force: Boolean = false) {

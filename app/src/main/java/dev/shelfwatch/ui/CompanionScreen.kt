@@ -18,6 +18,8 @@ import androidx.wear.compose.material.Switch
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.ToggleChip
 import dev.shelfwatch.Graph
+import dev.shelfwatch.R
+import dev.shelfwatch.str
 import dev.shelfwatch.companion.CompanionService
 
 @Composable
@@ -28,7 +30,7 @@ fun CompanionScreen() {
     val active = info.running || info.starting
 
     ScreenList {
-        item { ListHeader { Text("PC-Verbindung") } }
+        item { ListHeader { Text(str(R.string.pc_connection)) } }
         item {
             ToggleChip(
                 modifier = Modifier.fillMaxWidth(),
@@ -36,8 +38,8 @@ fun CompanionScreen() {
                 onCheckedChange = { on ->
                     if (on) CompanionService.start(ctx) else CompanionService.stop(ctx)
                 },
-                label = { Text(if (active) "Aktiv" else "Aus") },
-                secondaryLabel = { Text(if (info.starting) "Verbinde WLAN…" else "für ShelfWatch Companion") },
+                label = { Text(str(if (active) R.string.state_on else R.string.state_off)) },
+                secondaryLabel = { Text(str(if (info.starting) R.string.companion_connecting else R.string.companion_sub)) },
                 toggleControl = { Switch(checked = active) },
             )
         }
@@ -52,7 +54,7 @@ fun CompanionScreen() {
         }
         item {
             Text(
-                "Code: $pin",
+                str(R.string.companion_code, pin),
                 style = MaterialTheme.typography.title2,
                 color = MaterialTheme.colors.primary,
                 textAlign = TextAlign.Center,
@@ -64,7 +66,7 @@ fun CompanionScreen() {
         if (info.lastClient != null) {
             item {
                 Text(
-                    "PC ${info.lastClient} · ${formatAgo(info.lastClientAt)}",
+                    str(R.string.companion_last_pc, info.lastClient.orEmpty(), formatAgo(info.lastClientAt)),
                     style = MaterialTheme.typography.caption3,
                     textAlign = TextAlign.Center,
                 )
@@ -74,14 +76,14 @@ fun CompanionScreen() {
             Chip(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { pin = Graph.prefs.newCompanionPin() },
-                label = { Text("Neuer Code") },
-                secondaryLabel = { Text("trennt bekannte PCs") },
+                label = { Text(str(R.string.new_code)) },
+                secondaryLabel = { Text(str(R.string.new_code_sub)) },
                 colors = ChipDefaults.secondaryChipColors(),
             )
         }
         item {
             Text(
-                "Schaltet sich nach 30 min ohne Zugriff ab (außer während Downloads).",
+                str(R.string.companion_idle_hint),
                 style = MaterialTheme.typography.caption3,
                 textAlign = TextAlign.Center,
             )

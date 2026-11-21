@@ -37,6 +37,7 @@ import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.ToggleChip
 import dev.shelfwatch.Graph
 import dev.shelfwatch.R
+import dev.shelfwatch.str
 import dev.shelfwatch.companion.CompanionService
 import dev.shelfwatch.data.LibraryItem
 import dev.shelfwatch.download.DlState
@@ -52,15 +53,15 @@ fun LoginScreen(vm: MainViewModel) {
 
     ScreenList {
         item { ListHeader { Text("Audiobookshelf") } }
-        item { InputField("Server-URL", server, { server = it }, KeyboardType.Uri) }
-        item { InputField("Benutzer", user, { user = it }, KeyboardType.Text) }
-        item { InputField("Passwort", password, { password = it }, KeyboardType.Password, password = true) }
+        item { InputField(str(R.string.server_url), server, { server = it }, KeyboardType.Uri) }
+        item { InputField(str(R.string.username), user, { user = it }, KeyboardType.Text) }
+        item { InputField(str(R.string.password), password, { password = it }, KeyboardType.Password, password = true) }
         item {
             Chip(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { vm.login(server, user, password) },
                 enabled = !state.busy && server.isNotBlank() && user.isNotBlank(),
-                label = { Text(if (state.busy) "Verbinde…" else "Anmelden") },
+                label = { Text(str(if (state.busy) R.string.connecting else R.string.sign_in)) },
                 colors = ChipDefaults.primaryChipColors(),
             )
         }
@@ -99,7 +100,7 @@ fun HomeScreen(vm: MainViewModel, nav: NavHostController) {
                         )
                     },
                     label = { Text(np.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    secondaryLabel = { Text(if (ps.playWhenReady) "Läuft" else "Pausiert") },
+                    secondaryLabel = { Text(str(if (ps.playWhenReady) R.string.state_playing else R.string.state_paused)) },
                 )
             }
         }
@@ -111,8 +112,8 @@ fun HomeScreen(vm: MainViewModel, nav: NavHostController) {
                 Chip(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = { vm.logout() },
-                    label = { Text("Anmeldung abgelaufen") },
-                    secondaryLabel = { Text("Tippen zum Neuanmelden") },
+                    label = { Text(str(R.string.auth_expired)) },
+                    secondaryLabel = { Text(str(R.string.tap_to_sign_in)) },
                     colors = ChipDefaults.secondaryChipColors(),
                 )
             }
@@ -122,18 +123,18 @@ fun HomeScreen(vm: MainViewModel, nav: NavHostController) {
             item { CircularProgressIndicator(Modifier.size(28.dp)) }
         }
         if (home.offline) {
-            item { Text("Offline – Downloads verfügbar", style = MaterialTheme.typography.caption2) }
+            item { Text(str(R.string.offline_downloads), style = MaterialTheme.typography.caption2) }
         }
 
         if (home.inProgress.isNotEmpty()) {
-            item { ListHeader { Text("Weiterhören") } }
+            item { ListHeader { Text(str(R.string.continue_listening)) } }
             items(home.inProgress) { li ->
                 BookChip(rowOf(vm, li, progress, downloads.keys)) { nav.navigate("item/${li.id}") }
             }
         }
 
         if (home.libraries.isNotEmpty()) {
-            item { ListHeader { Text("Bibliotheken") } }
+            item { ListHeader { Text(str(R.string.libraries)) } }
             items(home.libraries) { lib ->
                 Chip(
                     modifier = Modifier.fillMaxWidth(),
@@ -145,14 +146,14 @@ fun HomeScreen(vm: MainViewModel, nav: NavHostController) {
             }
         }
 
-        item { ListHeader { Text("Mehr") } }
+        item { ListHeader { Text(str(R.string.more)) } }
         item {
             Chip(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { nav.navigate("downloads") },
                 icon = { Icon(painterResource(R.drawable.ic_download), contentDescription = null) },
-                label = { Text("Downloads") },
-                secondaryLabel = { Text("${downloads.values.count { it.complete }} Hörbücher") },
+                label = { Text(str(R.string.downloads)) },
+                secondaryLabel = { Text(str(R.string.n_audiobooks, downloads.values.count { it.complete })) },
                 colors = ChipDefaults.secondaryChipColors(),
             )
         }
@@ -162,8 +163,8 @@ fun HomeScreen(vm: MainViewModel, nav: NavHostController) {
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { nav.navigate("companion") },
                 icon = { Icon(painterResource(R.drawable.ic_computer), contentDescription = null) },
-                label = { Text("PC-Verbindung") },
-                secondaryLabel = { Text(if (companion.running) "Aktiv" else "Aus") },
+                label = { Text(str(R.string.pc_connection)) },
+                secondaryLabel = { Text(str(if (companion.running) R.string.state_on else R.string.state_off)) },
                 colors = ChipDefaults.secondaryChipColors(),
             )
         }
@@ -172,7 +173,7 @@ fun HomeScreen(vm: MainViewModel, nav: NavHostController) {
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { nav.navigate("settings") },
                 icon = { Icon(painterResource(R.drawable.ic_settings), contentDescription = null) },
-                label = { Text("Einstellungen") },
+                label = { Text(str(R.string.settings)) },
                 colors = ChipDefaults.secondaryChipColors(),
             )
         }
@@ -181,7 +182,7 @@ fun HomeScreen(vm: MainViewModel, nav: NavHostController) {
                 Chip(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = { vm.player.stop() },
-                    label = { Text("Wiedergabe beenden") },
+                    label = { Text(str(R.string.stop_playback)) },
                     colors = ChipDefaults.secondaryChipColors(),
                 )
             }
@@ -190,7 +191,7 @@ fun HomeScreen(vm: MainViewModel, nav: NavHostController) {
             Chip(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { vm.refreshHome() },
-                label = { Text(if (home.loading) "Lädt…" else "Aktualisieren") },
+                label = { Text(str(if (home.loading) R.string.loading else R.string.refresh)) },
                 colors = ChipDefaults.childChipColors(),
             )
         }
@@ -205,9 +206,9 @@ fun SyncLine(vm: MainViewModel) {
     // alle ~5 s neu berechnen, damit "vor x s" aktuell bleibt
     val now = remember(ps.positionMs / 5000, status) { System.currentTimeMillis() }
     val text = when {
-        pending > 0 -> "⟳ $pending ausstehend · ${formatAgo(status.lastSuccessAt, now)}"
-        status.lastSuccessAt > 0 -> "✓ Sync ${formatAgo(status.lastSuccessAt, now)}"
-        else -> "Sync: noch nicht"
+        pending > 0 -> str(R.string.sync_pending, pending, formatAgo(status.lastSuccessAt, now))
+        status.lastSuccessAt > 0 -> str(R.string.sync_ok, formatAgo(status.lastSuccessAt, now))
+        else -> str(R.string.sync_never)
     }
     Text(
         text,
@@ -226,7 +227,7 @@ private fun rowOf(
     val p = vm.progressOf(li.id, progress)
     return BookRow(
         id = li.id,
-        title = li.media?.metadata?.title ?: "Unbekannt",
+        title = li.media?.metadata?.title ?: str(R.string.unknown),
         author = li.media?.metadata?.authorName.orEmpty(),
         progress = p?.first,
         finished = p?.second == true,
@@ -244,7 +245,7 @@ fun LibraryScreen(vm: MainViewModel, nav: NavHostController, libraryId: String) 
     LaunchedEffect(libraryId) { vm.openLibrary(libraryId) }
 
     ScreenList {
-        item { ListHeader { Text(lib.name.ifBlank { "Bibliothek" }, maxLines = 1) } }
+        item { ListHeader { Text(lib.name.ifBlank { str(R.string.library) }, maxLines = 1) } }
         items(lib.items) { li ->
             BookChip(rowOf(vm, li, progress, downloads.keys)) { nav.navigate("item/${li.id}") }
         }
@@ -254,7 +255,7 @@ fun LibraryScreen(vm: MainViewModel, nav: NavHostController, libraryId: String) 
                 Chip(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = { vm.loadMore() },
-                    label = { Text("Fehler – erneut versuchen") },
+                    label = { Text(str(R.string.error_retry)) },
                     secondaryLabel = { Text(lib.error.orEmpty(), maxLines = 1) },
                     colors = ChipDefaults.secondaryChipColors(),
                 )
@@ -263,8 +264,8 @@ fun LibraryScreen(vm: MainViewModel, nav: NavHostController, libraryId: String) 
                 Chip(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = { vm.loadMore() },
-                    label = { Text("Mehr laden") },
-                    secondaryLabel = { Text("${lib.items.size} von ${lib.total}") },
+                    label = { Text(str(R.string.load_more)) },
+                    secondaryLabel = { Text(str(R.string.n_of_total, lib.items.size, lib.total)) },
                     colors = ChipDefaults.childChipColors(),
                 )
             }
@@ -310,7 +311,7 @@ fun ItemScreen(vm: MainViewModel, nav: NavHostController, itemId: String) {
         if (author.isNotBlank()) item { Text(author, style = MaterialTheme.typography.caption2, maxLines = 1) }
         item {
             val pText = when {
-                p?.second == true -> " · fertig"
+                p?.second == true -> " · " + str(R.string.finished)
                 p != null -> " · ${(p.first * 100).toInt()} %"
                 else -> ""
             }
@@ -325,8 +326,8 @@ fun ItemScreen(vm: MainViewModel, nav: NavHostController, itemId: String) {
                 },
                 enabled = li != null || downloaded,
                 icon = { Icon(painterResource(R.drawable.ic_play), contentDescription = null) },
-                label = { Text(if (p != null && p.first > 0 && !p.second) "Fortsetzen" else "Abspielen") },
-                secondaryLabel = { Text(if (downloaded) "Offline" else "Stream") },
+                label = { Text(str(if (p != null && p.first > 0 && !p.second) R.string.resume else R.string.play)) },
+                secondaryLabel = { Text(str(if (downloaded) R.string.offline else R.string.stream)) },
                 colors = ChipDefaults.primaryChipColors(),
             )
         }
@@ -338,27 +339,27 @@ fun ItemScreen(vm: MainViewModel, nav: NavHostController, itemId: String) {
                     label = {
                         Text(
                             when {
-                                dl.status == DlState.Status.QUEUED -> "Wartet…"
-                                dl.waitingForNetwork -> "Warte auf Netz · ${(dl.progress * 100).toInt()} %"
-                                else -> "Lädt ${(dl.progress * 100).toInt()} %"
+                                dl.status == DlState.Status.QUEUED -> str(R.string.dl_queued)
+                                dl.waitingForNetwork -> str(R.string.dl_waiting, (dl.progress * 100).toInt())
+                                else -> str(R.string.dl_running, (dl.progress * 100).toInt())
                             }
                         )
                     },
-                    secondaryLabel = { Text("Tippen zum Abbrechen") },
+                    secondaryLabel = { Text(str(R.string.tap_to_cancel)) },
                     colors = ChipDefaults.secondaryChipColors(),
                 )
                 downloaded && confirmDelete -> Chip(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = { vm.deleteDownload(itemId); confirmDelete = false },
                     icon = { Icon(painterResource(R.drawable.ic_delete), contentDescription = null) },
-                    label = { Text("Wirklich löschen?") },
+                    label = { Text(str(R.string.confirm_delete)) },
                     colors = ChipDefaults.primaryChipColors(backgroundColor = MaterialTheme.colors.error),
                 )
                 downloaded -> Chip(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = { confirmDelete = true },
                     icon = { Icon(painterResource(R.drawable.ic_delete), contentDescription = null) },
-                    label = { Text("Download löschen") },
+                    label = { Text(str(R.string.delete_download)) },
                     secondaryLabel = { Text(formatBytes(local!!.totalSize)) },
                     colors = ChipDefaults.secondaryChipColors(),
                 )
@@ -374,7 +375,7 @@ fun ItemScreen(vm: MainViewModel, nav: NavHostController, itemId: String) {
                     },
                     enabled = li != null,
                     icon = { Icon(painterResource(R.drawable.ic_download), contentDescription = null) },
-                    label = { Text(if (dl?.status == DlState.Status.FAILED) "Erneut laden" else "Herunterladen") },
+                    label = { Text(str(if (dl?.status == DlState.Status.FAILED) R.string.retry_download else R.string.download)) },
                     secondaryLabel = {
                         Text(
                             dl?.error ?: if (sizeBytes > 0) formatBytes(sizeBytes) else "",
@@ -387,7 +388,7 @@ fun ItemScreen(vm: MainViewModel, nav: NavHostController, itemId: String) {
             }
         }
         st?.error?.takeIf { li == null && !downloaded }?.let {
-            item { Text("Nicht erreichbar: $it", style = MaterialTheme.typography.caption3, textAlign = TextAlign.Center) }
+            item { Text(str(R.string.unreachable, it), style = MaterialTheme.typography.caption3, textAlign = TextAlign.Center) }
         }
         error?.let {
             item { Text(it, style = MaterialTheme.typography.caption3, color = MaterialTheme.colors.error) }
@@ -403,7 +404,7 @@ fun DownloadsScreen(vm: MainViewModel, nav: NavHostController) {
     val dlStates by vm.downloadStates.collectAsState()
 
     ScreenList {
-        item { ListHeader { Text("Downloads") } }
+        item { ListHeader { Text(str(R.string.downloads)) } }
         val active = dlStates.entries.toList()
         items(active) { (id, s) ->
             Chip(
@@ -411,15 +412,15 @@ fun DownloadsScreen(vm: MainViewModel, nav: NavHostController) {
                 onClick = {
                     if (s.status == DlState.Status.FAILED) vm.download(id) else nav.navigate("item/$id")
                 },
-                label = { Text(downloads[id]?.title ?: "Hörbuch", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                label = { Text(downloads[id]?.title ?: str(R.string.audiobook), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 secondaryLabel = {
                     Text(
                         when (s.status) {
-                            DlState.Status.QUEUED -> "Wartet…"
+                            DlState.Status.QUEUED -> str(R.string.dl_queued)
                             DlState.Status.RUNNING ->
-                                if (s.waitingForNetwork) "Warte auf Netz · ${(s.progress * 100).toInt()} %"
-                                else "Lädt ${(s.progress * 100).toInt()} %"
-                            DlState.Status.FAILED -> "Fehler – tippen für erneuten Versuch"
+                                if (s.waitingForNetwork) str(R.string.dl_waiting, (s.progress * 100).toInt())
+                                else str(R.string.dl_running, (s.progress * 100).toInt())
+                            DlState.Status.FAILED -> str(R.string.dl_failed_tap)
                         },
                         maxLines = 1,
                     )
@@ -429,7 +430,7 @@ fun DownloadsScreen(vm: MainViewModel, nav: NavHostController) {
         }
         val done = downloads.values.filter { it.complete }.sortedByDescending { it.downloadedAt }
         if (done.isEmpty() && active.isEmpty()) {
-            item { Text("Noch nichts heruntergeladen", textAlign = TextAlign.Center) }
+            item { Text(str(R.string.nothing_downloaded), textAlign = TextAlign.Center) }
         }
         items(done) { d ->
             val p = vm.progressOf(d.itemId, emptyMap())
@@ -441,7 +442,7 @@ fun DownloadsScreen(vm: MainViewModel, nav: NavHostController) {
             val used = remember(downloads) { Graph.downloads.usedBytes() }
             val free = remember(downloads) { Graph.downloads.freeBytes() }
             Text(
-                "Belegt ${formatBytes(used)} · frei ${formatBytes(free)}",
+                str(R.string.storage, formatBytes(used), formatBytes(free)),
                 style = MaterialTheme.typography.caption3,
                 textAlign = TextAlign.Center,
             )
@@ -465,13 +466,13 @@ fun SettingsScreen(vm: MainViewModel, onAlwaysOnChanged: () -> Unit) {
     val batteryExempt = remember { isBatteryExempt(ctx) }
 
     ScreenList {
-        item { ListHeader { Text("Einstellungen") } }
+        item { ListHeader { Text(str(R.string.settings)) } }
         item {
             Chip(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { openBluetooth(ctx) },
                 icon = { Icon(painterResource(R.drawable.ic_bluetooth), contentDescription = null) },
-                label = { Text("Kopfhörer koppeln") },
+                label = { Text(str(R.string.pair_headphones)) },
                 colors = ChipDefaults.secondaryChipColors(),
             )
         }
@@ -479,8 +480,8 @@ fun SettingsScreen(vm: MainViewModel, onAlwaysOnChanged: () -> Unit) {
             Chip(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { requestBatteryExemption(ctx) },
-                label = { Text("Akku-Optimierung") },
-                secondaryLabel = { Text(if (batteryExempt) "Deaktiviert ✓" else "Aktiv – tippen zum Abschalten") },
+                label = { Text(str(R.string.battery_optimization)) },
+                secondaryLabel = { Text(str(if (batteryExempt) R.string.battery_disabled else R.string.battery_enabled)) },
                 colors = ChipDefaults.secondaryChipColors(),
             )
         }
@@ -493,8 +494,8 @@ fun SettingsScreen(vm: MainViewModel, onAlwaysOnChanged: () -> Unit) {
                     prefs.alwaysOn = it
                     onAlwaysOnChanged()
                 },
-                label = { Text("Always-on Player") },
-                secondaryLabel = { Text("App bleibt im Vordergrund") },
+                label = { Text(str(R.string.always_on)) },
+                secondaryLabel = { Text(str(R.string.always_on_sub)) },
                 toggleControl = { Switch(checked = alwaysOn) },
             )
         }
@@ -503,7 +504,7 @@ fun SettingsScreen(vm: MainViewModel, onAlwaysOnChanged: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 checked = pauseOnDisconnect,
                 onCheckedChange = { pauseOnDisconnect = it; prefs.pauseOnDisconnect = it },
-                label = { Text("Pause bei Kopfhörer-Trennung") },
+                label = { Text(str(R.string.pause_on_disconnect)) },
                 toggleControl = { Switch(checked = pauseOnDisconnect) },
             )
         }
@@ -512,8 +513,8 @@ fun SettingsScreen(vm: MainViewModel, onAlwaysOnChanged: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 checked = preferWifi,
                 onCheckedChange = { preferWifi = it; prefs.preferWifiDownloads = it },
-                label = { Text("Downloads über WLAN") },
-                secondaryLabel = { Text("schneller als Bluetooth") },
+                label = { Text(str(R.string.wifi_downloads)) },
+                secondaryLabel = { Text(str(R.string.wifi_downloads_sub)) },
                 toggleControl = { Switch(checked = preferWifi) },
             )
         }
@@ -525,7 +526,7 @@ fun SettingsScreen(vm: MainViewModel, onAlwaysOnChanged: () -> Unit) {
                     skipBack = opts[(opts.indexOf(skipBack) + 1) % opts.size]
                     prefs.skipBackSec = skipBack
                 },
-                label = { Text("Zurück: $skipBack s") },
+                label = { Text(str(R.string.skip_back, skipBack)) },
                 colors = ChipDefaults.secondaryChipColors(),
             )
         }
@@ -537,7 +538,7 @@ fun SettingsScreen(vm: MainViewModel, onAlwaysOnChanged: () -> Unit) {
                     skipFwd = opts[(opts.indexOf(skipFwd) + 1) % opts.size]
                     prefs.skipForwardSec = skipFwd
                 },
-                label = { Text("Vor: $skipFwd s") },
+                label = { Text(str(R.string.skip_forward, skipFwd)) },
                 colors = ChipDefaults.secondaryChipColors(),
             )
         }
@@ -545,8 +546,8 @@ fun SettingsScreen(vm: MainViewModel, onAlwaysOnChanged: () -> Unit) {
             Chip(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { vm.syncNow() },
-                label = { Text("Jetzt synchronisieren") },
-                secondaryLabel = { Text(if (pending > 0) "$pending ausstehend" else "alles aktuell") },
+                label = { Text(str(R.string.sync_now)) },
+                secondaryLabel = { Text(if (pending > 0) str(R.string.n_pending, pending) else str(R.string.all_synced)) },
                 colors = ChipDefaults.secondaryChipColors(),
             )
         }
@@ -562,8 +563,8 @@ fun SettingsScreen(vm: MainViewModel, onAlwaysOnChanged: () -> Unit) {
             Chip(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { if (confirmLogout) vm.logout() else confirmLogout = true },
-                label = { Text(if (confirmLogout) "Wirklich abmelden?" else "Abmelden") },
-                secondaryLabel = { Text("Downloads bleiben erhalten") },
+                label = { Text(str(if (confirmLogout) R.string.confirm_logout else R.string.logout)) },
+                secondaryLabel = { Text(str(R.string.downloads_kept)) },
                 colors = ChipDefaults.secondaryChipColors(),
             )
         }

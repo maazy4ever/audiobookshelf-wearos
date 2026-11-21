@@ -17,3 +17,12 @@ companion-windows/publish/
 # Build-Ausgaben
 *.apk
 *.aab
+
+# Release-Signierschlüssel (niemals committen!)
+keystore/
+keystore.properties
+*.jks
+*.keystore
+
+# Release-Ausgabe
+dist/

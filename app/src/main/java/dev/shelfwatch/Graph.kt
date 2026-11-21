@@ -15,6 +15,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 
+/** Lokalisierter Text aus res/values(-de)/strings.xml – nutzbar in UI und Diensten. */
+fun str(@androidx.annotation.StringRes id: Int, vararg args: Any): String = Graph.app.getString(id, *args)
+
 /** Einfacher Service-Locator – alles läuft in einem Prozess. */
 object Graph {
     lateinit var app: Application

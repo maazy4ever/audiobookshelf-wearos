@@ -1,6 +1,8 @@
 package dev.shelfwatch.data
 
 import dev.shelfwatch.Graph
+import dev.shelfwatch.R
+import dev.shelfwatch.str
 import kotlinx.coroutines.CancellationException
 
 class LoginException(message: String) : Exception(message)
@@ -12,18 +14,18 @@ object Auth {
     suspend fun login(serverInput: String, username: String, password: String) {
         val api = Graph.api
         val prefs = Graph.prefs
-        if (serverInput.isBlank() || username.isBlank()) throw LoginException("Server und Benutzer angeben")
+        if (serverInput.isBlank() || username.isBlank()) throw LoginException(str(R.string.err_server_user_required))
         val user = try {
             val server = resolveServer(serverInput.trim())
             api.login(server, username.trim(), password).also { prefs.serverUrl = server }
         } catch (e: CancellationException) {
             throw e
         } catch (e: ApiException) {
-            throw LoginException(if (e.code == 401) "Benutzername oder Passwort falsch" else e.message ?: "Fehler")
+            throw LoginException(if (e.code == 401) str(R.string.err_bad_credentials) else e.message ?: str(R.string.err_login_failed))
         } catch (e: Exception) {
-            throw LoginException("Server nicht erreichbar: ${e.message}")
+            throw LoginException(str(R.string.err_server_unreachable, e.message.orEmpty()))
         }
-        val token = user.accessToken ?: user.token ?: throw LoginException("Kein Token erhalten")
+        val token = user.accessToken ?: user.token ?: throw LoginException(str(R.string.err_no_token))
         prefs.accessToken = token
         prefs.refreshToken = user.refreshToken
         prefs.username = user.username

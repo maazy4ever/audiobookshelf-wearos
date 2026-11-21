@@ -38,6 +38,7 @@ import androidx.wear.compose.material.TimeText
 import coil.compose.AsyncImage
 import dev.shelfwatch.Graph
 import dev.shelfwatch.R
+import dev.shelfwatch.str
 import java.util.Locale
 
 val ShelfColors = Colors(
@@ -94,7 +95,7 @@ fun BookChip(row: BookRow, onClick: () -> Unit) {
             val parts = buildList {
                 if (row.author.isNotBlank()) add(row.author)
                 when {
-                    row.finished -> add("fertig")
+                    row.finished -> add(str(R.string.finished))
                     row.progress != null && row.progress > 0.0 -> add("${(row.progress * 100).toInt()} %")
                 }
                 if (row.downloaded) add("⬇")
@@ -171,13 +172,13 @@ fun formatBytes(b: Long): String = when {
 }
 
 fun formatAgo(ms: Long, now: Long = System.currentTimeMillis()): String {
-    if (ms <= 0) return "nie"
+    if (ms <= 0) return str(R.string.ago_never)
     val d = (now - ms) / 1000
     return when {
-        d < 10 -> "gerade eben"
-        d < 60 -> "vor $d s"
-        d < 3600 -> "vor ${d / 60} min"
-        d < 86400 -> "vor ${d / 3600} h"
-        else -> "vor ${d / 86400} Tagen"
+        d < 10 -> str(R.string.ago_now)
+        d < 60 -> str(R.string.ago_seconds, d.toInt())
+        d < 3600 -> str(R.string.ago_minutes, (d / 60).toInt())
+        d < 86400 -> str(R.string.ago_hours, (d / 3600).toInt())
+        else -> str(R.string.ago_days, (d / 86400).toInt())
     }
 }

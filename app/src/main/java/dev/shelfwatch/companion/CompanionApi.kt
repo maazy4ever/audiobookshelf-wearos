@@ -6,6 +6,8 @@ import android.os.SystemClock
 import android.provider.Settings
 import dev.shelfwatch.BuildConfig
 import dev.shelfwatch.Graph
+import dev.shelfwatch.R
+import dev.shelfwatch.str
 import dev.shelfwatch.data.Auth
 import dev.shelfwatch.data.LoginException
 import dev.shelfwatch.download.DlState
@@ -130,11 +132,11 @@ class CompanionApi(private val context: Context, private val onRequest: (String)
         // --- Code prüfen (mit Sperre nach 5 Fehlversuchen) ---
         val now = SystemClock.elapsedRealtime()
         val f = failures[ip]
-        if (f != null && f.second > now) return 429 to err("Zu viele Fehlversuche – bitte 60 s warten")
+        if (f != null && f.second > now) return 429 to err(str(R.string.err_too_many_attempts))
         if (headers["x-shelfwatch-pin"] != Graph.prefs.companionPin) {
             val count = (f?.first ?: 0) + 1
             failures[ip] = if (count >= 5) 0 to now + 60_000 else count to 0L
-            return 401 to err("Falscher Code")
+            return 401 to err(str(R.string.err_wrong_code))
         }
         failures.remove(ip)
         onRequest(ip)
@@ -149,7 +151,7 @@ class CompanionApi(private val context: Context, private val onRequest: (String)
                 Auth.logout()
                 200 to ok()
             }
-            else -> 404 to err("Unbekannter Pfad: $method $path")
+            else -> 404 to err("Unknown path: $method $path")
         }
     }
 
@@ -209,20 +211,20 @@ class CompanionApi(private val context: Context, private val onRequest: (String)
     }
 
     private fun enqueue(itemId: String): Pair<Int, String> {
-        if (!idPattern.matches(itemId)) return 400 to err("Ungültige ID")
-        if (!Graph.loggedIn.value) return 409 to err("Die Uhr ist nicht bei Audiobookshelf angemeldet")
+        if (!idPattern.matches(itemId)) return 400 to err(str(R.string.err_invalid_id))
+        if (!Graph.loggedIn.value) return 409 to err(str(R.string.err_watch_not_signed_in))
         if (Graph.downloads.isDownloaded(itemId)) return 200 to ok()
         return try {
             DownloadService.enqueue(context, itemId)
             200 to ok()
         } catch (e: Exception) {
             // Download bleibt in der Warteschlange und startet beim nächsten Öffnen der App
-            409 to err("Download vorgemerkt – bitte ShelfWatch auf der Uhr öffnen (${e.javaClass.simpleName})")
+            409 to err(str(R.string.err_download_deferred, e.javaClass.simpleName))
         }
     }
 
     private fun remove(itemId: String): Pair<Int, String> {
-        if (!idPattern.matches(itemId)) return 400 to err("Ungültige ID")
+        if (!idPattern.matches(itemId)) return 400 to err(str(R.string.err_invalid_id))
         if (DownloadService.state.value.containsKey(itemId)) DownloadService.cancel(itemId)
         Graph.downloads.delete(itemId)
         return 200 to ok()
@@ -232,7 +234,7 @@ class CompanionApi(private val context: Context, private val onRequest: (String)
         runBlocking { Auth.login(req.server, req.username, req.password) }
         200 to ok()
     } catch (e: LoginException) {
-        400 to err(e.message ?: "Anmeldung fehlgeschlagen")
+        400 to err(e.message ?: str(R.string.err_login_failed))
     }
 
     private fun ok() = json.encodeToString(CResult(true))

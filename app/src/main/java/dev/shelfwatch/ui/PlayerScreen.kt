@@ -40,6 +40,7 @@ import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.TimeText
 import dev.shelfwatch.Graph
 import dev.shelfwatch.R
+import dev.shelfwatch.str
 import java.util.Locale
 import kotlin.math.abs
 
@@ -101,7 +102,7 @@ fun PlayerScreen(vm: MainViewModel) {
             ) {
                 Spacer(Modifier.height(14.dp))
                 Text(
-                    item?.title ?: if (loading) "Lädt…" else "Nichts ausgewählt",
+                    item?.title ?: str(if (loading) R.string.loading else R.string.nothing_selected),
                     style = MaterialTheme.typography.button,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -121,7 +122,7 @@ fun PlayerScreen(vm: MainViewModel) {
                         onClick = { vm.player.seekBy(-Graph.prefs.skipBackSec) },
                         modifier = Modifier.size(ButtonDefaults.SmallButtonSize),
                         colors = ButtonDefaults.secondaryButtonColors(),
-                    ) { Icon(painterResource(R.drawable.ic_replay), contentDescription = "Zurück") }
+                    ) { Icon(painterResource(R.drawable.ic_replay), contentDescription = str(R.string.rewind)) }
                     Spacer(Modifier.width(6.dp))
                     Button(
                         onClick = { vm.player.togglePlay() },
@@ -133,7 +134,7 @@ fun PlayerScreen(vm: MainViewModel) {
                         } else {
                             Icon(
                                 painterResource(if (ps.playWhenReady) R.drawable.ic_pause else R.drawable.ic_play),
-                                contentDescription = if (ps.playWhenReady) "Pause" else "Abspielen",
+                                contentDescription = str(if (ps.playWhenReady) R.string.pause else R.string.play),
                                 modifier = Modifier.size(30.dp),
                             )
                         }
@@ -143,7 +144,7 @@ fun PlayerScreen(vm: MainViewModel) {
                         onClick = { vm.player.seekBy(Graph.prefs.skipForwardSec) },
                         modifier = Modifier.size(ButtonDefaults.SmallButtonSize),
                         colors = ButtonDefaults.secondaryButtonColors(),
-                    ) { Icon(painterResource(R.drawable.ic_forward), contentDescription = "Vor") }
+                    ) { Icon(painterResource(R.drawable.ic_forward), contentDescription = str(R.string.fast_forward)) }
                 }
                 Spacer(Modifier.height(4.dp))
                 // Sync-Punkt: grün = synchronisiert, orange = ausstehend
@@ -164,7 +165,7 @@ fun PlayerScreen(vm: MainViewModel) {
                 }
                 Spacer(Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    SmallAction(R.drawable.ic_skip_previous, "Kapitel zurück", enabled = item?.chapters?.isNotEmpty() == true) {
+                    SmallAction(R.drawable.ic_skip_previous, str(R.string.prev_chapter), enabled = item?.chapters?.isNotEmpty() == true) {
                         val chapters = item?.chapters.orEmpty()
                         val cur = chapters.indexOfLast { posSec >= it.start - 0.5 }
                         if (cur >= 0) {
@@ -187,7 +188,7 @@ fun PlayerScreen(vm: MainViewModel) {
                         Text("$label×", style = MaterialTheme.typography.caption2)
                     }
                     Spacer(Modifier.width(4.dp))
-                    SmallAction(R.drawable.ic_skip_next, "Kapitel vor", enabled = item?.chapters?.isNotEmpty() == true) {
+                    SmallAction(R.drawable.ic_skip_next, str(R.string.next_chapter), enabled = item?.chapters?.isNotEmpty() == true) {
                         item?.chapters?.firstOrNull { it.start > posSec + 0.5 }?.let { vm.player.seekToSec(it.start) }
                     }
                     Spacer(Modifier.width(4.dp))

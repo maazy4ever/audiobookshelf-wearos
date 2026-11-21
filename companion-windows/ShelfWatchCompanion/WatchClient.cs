@@ -63,11 +63,11 @@ public class WatchClient
         }
         catch (TaskCanceledException)
         {
-            throw new WatchException("Uhr antwortet nicht – ist „PC-Verbindung“ auf der Uhr aktiv?");
+            throw new WatchException(L.WatchNoResponse);
         }
         catch (HttpRequestException e)
         {
-            throw new WatchException($"Uhr nicht erreichbar: {e.Message}");
+            throw new WatchException(L.WatchUnreachable(e.Message));
         }
         using (resp)
         {

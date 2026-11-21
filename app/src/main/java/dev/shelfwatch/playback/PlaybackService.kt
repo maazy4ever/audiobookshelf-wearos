@@ -35,6 +35,8 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import dev.shelfwatch.BuildConfig
 import dev.shelfwatch.Graph
+import dev.shelfwatch.R
+import dev.shelfwatch.str
 import dev.shelfwatch.data.ApiException
 import dev.shelfwatch.data.Prefs
 import dev.shelfwatch.ui.MainActivity
@@ -263,7 +265,7 @@ class PlaybackService : MediaSessionService() {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Graph.playbackError.value = e.message ?: "Fehler beim Laden"
+                Graph.playbackError.value = e.message ?: str(R.string.err_loading)
             } finally {
                 Graph.playbackLoading.value = false
             }
@@ -275,14 +277,14 @@ class PlaybackService : MediaSessionService() {
         val li = try {
             Graph.api.item(itemId)
         } catch (e: IOException) {
-            throw IOException("Offline und nicht heruntergeladen (${e.message})")
+            throw IOException(str(R.string.err_offline_not_downloaded, e.message.orEmpty()))
         }
-        val media = li.media ?: throw IOException("Kein Medium gefunden")
+        val media = li.media ?: throw IOException(str(R.string.err_no_media))
         val files = media.audioFiles.filter { !it.exclude }.sortedBy { it.index }
-        if (files.isEmpty()) throw IOException("Keine Audiodateien (Podcasts werden nicht unterstützt)")
+        if (files.isEmpty()) throw IOException(str(R.string.err_no_audio))
         return PlayableItem(
             itemId = itemId,
-            title = media.metadata.title ?: "Unbekannt",
+            title = media.metadata.title ?: str(R.string.unknown),
             author = media.metadata.authorName.orEmpty(),
             duration = media.duration.takeIf { it > 0 } ?: files.sumOf { it.duration },
             tracks = files.map { PlayTrack(Graph.api.fileUrl(itemId, it.ino), it.duration) },
@@ -385,11 +387,11 @@ class PlaybackService : MediaSessionService() {
         if (active == null) return
         saveLocal()
         if (retryCount >= MAX_RETRIES) {
-            Graph.playbackError.value = "Wiedergabe fehlgeschlagen: ${error.errorCodeName}"
+            Graph.playbackError.value = str(R.string.err_playback_failed, error.errorCodeName)
             return
         }
         retryCount++
-        Graph.playbackError.value = "Verbindungsproblem – neuer Versuch ($retryCount)…"
+        Graph.playbackError.value = str(R.string.err_retrying, retryCount)
         retryWakeLock.acquire(90_000)
         scope.launch {
             delay((retryCount * 3_000L).coerceAtMost(30_000L))

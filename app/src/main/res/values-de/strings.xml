@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Login -->
+    <string name="server_url">Server-URL</string>
+    <string name="username">Benutzer</string>
+    <string name="password">Passwort</string>
+    <string name="connecting">Verbinde…</string>
+    <string name="sign_in">Anmelden</string>
+
+    <!-- Start -->
+    <string name="state_playing">Läuft</string>
+    <string name="state_paused">Pausiert</string>
+    <string name="auth_expired">Anmeldung abgelaufen</string>
+    <string name="tap_to_sign_in">Tippen zum Neuanmelden</string>
+    <string name="offline_downloads">Offline – Downloads verfügbar</string>
+    <string name="continue_listening">Weiterhören</string>
+    <string name="libraries">Bibliotheken</string>
+    <string name="more">Mehr</string>
+    <string name="downloads">Downloads</string>
+    <string name="n_audiobooks">%d Hörbücher</string>
+    <string name="pc_connection">PC-Verbindung</string>
+    <string name="state_on">Aktiv</string>
+    <string name="state_off">Aus</string>
+    <string name="settings">Einstellungen</string>
+    <string name="stop_playback">Wiedergabe beenden</string>
+    <string name="loading">Lädt…</string>
+    <string name="refresh">Aktualisieren</string>
+    <string name="unknown">Unbekannt</string>
+    <string name="audiobook">Hörbuch</string>
+
+    <!-- Sync -->
+    <string name="sync_pending">⟳ %1$d ausstehend · %2$s</string>
+    <string name="sync_ok">✓ Sync %s</string>
+    <string name="sync_never">Sync: noch nicht</string>
+    <string name="ago_never">nie</string>
+    <string name="ago_now">gerade eben</string>
+    <string name="ago_seconds">vor %d s</string>
+    <string name="ago_minutes">vor %d min</string>
+    <string name="ago_hours">vor %d h</string>
+    <string name="ago_days">vor %d Tagen</string>
+
+    <!-- Bibliothek -->
+    <string name="library">Bibliothek</string>
+    <string name="error_retry">Fehler – erneut versuchen</string>
+    <string name="load_more">Mehr laden</string>
+    <string name="n_of_total">%1$d von %2$d</string>
+
+    <!-- Details -->
+    <string name="finished">fertig</string>
+    <string name="resume">Fortsetzen</string>
+    <string name="play">Abspielen</string>
+    <string name="offline">Offline</string>
+    <string name="stream">Stream</string>
+    <string name="dl_queued">Wartet…</string>
+    <string name="dl_waiting">Warte auf Netz · %d %%</string>
+    <string name="dl_running">Lädt %d %%</string>
+    <string name="tap_to_cancel">Tippen zum Abbrechen</string>
+    <string name="confirm_delete">Wirklich löschen?</string>
+    <string name="delete_download">Download löschen</string>
+    <string name="retry_download">Erneut laden</string>
+    <string name="download">Herunterladen</string>
+    <string name="unreachable">Nicht erreichbar: %s</string>
+
+    <!-- Downloads -->
+    <string name="dl_failed_tap">Fehler – tippen für erneuten Versuch</string>
+    <string name="nothing_downloaded">Noch nichts heruntergeladen</string>
+    <string name="storage">Belegt %1$s · frei %2$s</string>
+
+    <!-- Einstellungen -->
+    <string name="pair_headphones">Kopfhörer koppeln</string>
+    <string name="battery_optimization">Akku-Optimierung</string>
+    <string name="battery_disabled">Deaktiviert ✓</string>
+    <string name="battery_enabled">Aktiv – tippen zum Abschalten</string>
+    <string name="always_on">Always-on Player</string>
+    <string name="always_on_sub">App bleibt im Vordergrund</string>
+    <string name="pause_on_disconnect">Pause bei Kopfhörer-Trennung</string>
+    <string name="wifi_downloads">Downloads über WLAN</string>
+    <string name="wifi_downloads_sub">schneller als Bluetooth</string>
+    <string name="skip_back">Zurück: %d s</string>
+    <string name="skip_forward">Vor: %d s</string>
+    <string name="sync_now">Jetzt synchronisieren</string>
+    <string name="n_pending">%d ausstehend</string>
+    <string name="all_synced">alles aktuell</string>
+    <string name="confirm_logout">Wirklich abmelden?</string>
+    <string name="logout">Abmelden</string>
+    <string name="downloads_kept">Downloads bleiben erhalten</string>
+
+    <!-- Player -->
+    <string name="nothing_selected">Nichts ausgewählt</string>
+    <string name="rewind">Zurück</string>
+    <string name="pause">Pause</string>
+    <string name="fast_forward">Vor</string>
+    <string name="prev_chapter">Kapitel zurück</string>
+    <string name="next_chapter">Kapitel vor</string>
+    <string name="time_left">noch %1$d h %2$d min</string>
+
+    <!-- PC-Verbindung -->
+    <string name="companion_connecting">Verbinde WLAN…</string>
+    <string name="companion_sub">für ShelfWatch Companion</string>
+    <string name="companion_code">Code: %s</string>
+    <string name="companion_last_pc">PC %1$s · %2$s</string>
+    <string name="new_code">Neuer Code</string>
+    <string name="new_code_sub">trennt bekannte PCs</string>
+    <string name="companion_idle_hint">Schaltet sich nach 30 min ohne Zugriff ab (außer während Downloads).</string>
+    <string name="pc_connection_active">PC-Verbindung aktiv</string>
+    <string name="starting">Wird gestartet…</string>
+
+    <!-- Fehler / Dienste -->
+    <string name="err_offline_not_downloaded">Offline und nicht heruntergeladen (%s)</string>
+    <string name="err_no_media">Kein Medium gefunden</string>
+    <string name="err_no_audio">Keine Audiodateien (Podcasts werden nicht unterstützt)</string>
+    <string name="err_loading">Fehler beim Laden</string>
+    <string name="err_playback_failed">Wiedergabe fehlgeschlagen: %s</string>
+    <string name="err_retrying">Verbindungsproblem – neuer Versuch (%d)…</string>
+    <string name="dl_preparing">Download wird vorbereitet…</string>
+    <string name="dl_time_limit">Zeitlimit erreicht – wird später fortgesetzt</string>
+    <string name="dl_done">Download fertig</string>
+    <string name="dl_waiting_connection">Warte auf Verbindung…</string>
+    <string name="err_save_file">Datei konnte nicht gespeichert werden</string>
+    <string name="err_file_access">Kein Zugriff auf Datei</string>
+    <string name="err_start">Start nicht möglich: %s</string>
+    <string name="err_no_wifi">Kein WLAN – bitte auf der Uhr ein WLAN einrichten</string>
+    <string name="err_port">Port %1$d nicht verfügbar: %2$s</string>
+    <string name="err_too_many_attempts">Zu viele Fehlversuche – bitte 60 s warten</string>
+    <string name="err_wrong_code">Falscher Code</string>
+    <string name="err_invalid_id">Ungültige ID</string>
+    <string name="err_watch_not_signed_in">Die Uhr ist nicht bei Audiobookshelf angemeldet</string>
+    <string name="err_download_deferred">Download vorgemerkt – bitte ShelfWatch auf der Uhr öffnen (%s)</string>
+    <string name="err_login_failed">Anmeldung fehlgeschlagen</string>
+    <string name="err_server_user_required">Server und Benutzer angeben</string>
+    <string name="err_bad_credentials">Benutzername oder Passwort falsch</string>
+    <string name="err_server_unreachable">Server nicht erreichbar: %s</string>
+    <string name="err_no_token">Kein Token erhalten</string>
+</resources>

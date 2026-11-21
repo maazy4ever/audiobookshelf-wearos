@@ -12,6 +12,7 @@ import androidx.wear.ongoing.OngoingActivity
 import androidx.wear.ongoing.Status
 import com.google.common.collect.ImmutableList
 import dev.shelfwatch.R
+import dev.shelfwatch.str
 import dev.shelfwatch.ui.MainActivity
 
 /**
@@ -34,7 +35,7 @@ class WearMediaNotificationProvider(private val context: Context) :
         actionFactory: MediaNotification.ActionFactory,
     ): IntArray {
         val result = super.addNotificationActions(mediaSession, mediaButtons, builder, actionFactory)
-        val title = mediaSession.player.mediaMetadata.title?.toString() ?: "Hörbuch"
+        val title = mediaSession.player.mediaMetadata.title?.toString() ?: str(R.string.audiobook)
         val touchIntent = PendingIntent.getActivity(
             context, 0, MainActivity.playerIntent(context),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,

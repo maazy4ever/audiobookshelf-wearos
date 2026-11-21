@@ -59,7 +59,7 @@ public partial class MainWindow : Window
         }
         catch (Exception e)
         {
-            StatusText.Text = "Fehler: " + e.Message;
+            StatusText.Text = L.Error(e.Message);
         }
     }
 
@@ -79,21 +79,21 @@ public partial class MainWindow : Window
     private async void Discover_Click(object sender, RoutedEventArgs e) => await Guard(async () =>
     {
         DiscoverBtn.IsEnabled = false;
-        StatusText.Text = "Suche Uhr im Netzwerk…";
+        StatusText.Text = L.Searching;
         try
         {
             var found = await WatchClient.DiscoverAsync(TimeSpan.FromSeconds(3));
             if (found.Count == 0)
             {
-                StatusText.Text = "Keine Uhr gefunden. Ist „PC-Verbindung“ auf der Uhr aktiv? Sonst IP manuell eintragen.";
+                StatusText.Text = L.NoWatchFound;
                 return;
             }
             var w = found[0];
             WatchIp.Text = w.Ip;
             WatchPort.Text = w.Port.ToString();
             StatusText.Text = found.Count == 1
-                ? $"Gefunden: {w}. Code von der Uhr eingeben und „Verbinden“."
-                : $"{found.Count} Uhren gefunden, verwende {w}.";
+                ? L.FoundOne(w.ToString())
+                : L.FoundMany(found.Count, w.ToString());
             if (WatchPin.Password != "") await ConnectAsync();
             else WatchPin.Focus();
         }
@@ -108,18 +108,18 @@ public partial class MainWindow : Window
     private async Task ConnectAsync()
     {
         var ip = WatchIp.Text.Trim();
-        if (ip == "") throw new WatchException("Bitte IP der Uhr eintragen oder „Uhr suchen“.");
+        if (ip == "") throw new WatchException(L.EnterIp);
         if (!int.TryParse(WatchPort.Text, out var port)) port = 8765;
         var pin = WatchPin.Password.Trim();
-        if (pin == "") throw new WatchException("Bitte den Code von der Uhr eingeben.");
+        if (pin == "") throw new WatchException(L.EnterCode);
 
-        StatusText.Text = "Verbinde…";
+        StatusText.Text = L.ConnectingWatch;
         var client = new WatchClient(ip, port, pin);
         var st = await client.StatusAsync();
         _watch = client;
         SaveSettings();
         ShowStatus(st);
-        StatusText.Text = "Mit der Uhr verbunden.";
+        StatusText.Text = L.ConnectedWatch;
         _timer.Start();
         await PollAsync();
     }
@@ -137,7 +137,7 @@ public partial class MainWindow : Window
         }
         catch (WatchException e)
         {
-            WatchStatusText.Text = "Verbindung unterbrochen: " + e.Message;
+            WatchStatusText.Text = L.ConnectionLost(e.Message);
         }
         finally
         {
@@ -148,20 +148,20 @@ public partial class MainWindow : Window
     private void ShowStatus(WatchStatus st)
     {
         var account = st.LoggedIn
-            ? $"angemeldet als {st.Username} @ {st.Server}" + (st.AuthExpired ? " – Anmeldung abgelaufen!" : "")
-            : "nicht bei Audiobookshelf angemeldet → Tab „Bibliothek & Konto“ → „Auf Uhr anmelden“";
-        WatchStatusText.Text = $"Verbunden mit {st.Device} (ShelfWatch {st.AppVersion}) · {account}";
+            ? L.SignedInAs(st.Username, st.Server) + (st.AuthExpired ? L.SignInExpired : "")
+            : L.NotSignedIn;
+        WatchStatusText.Text = L.ConnectedTo(st.Device, st.AppVersion, account);
 
         var sync = st.PendingSync > 0
-            ? $"{st.PendingSync} Fortschritt(e) warten auf Sync"
+            ? L.PendingSync(st.PendingSync)
             : st.LastSyncAt > 0
-                ? "Sync ok " + DateTimeOffset.FromUnixTimeMilliseconds(st.LastSyncAt).LocalDateTime.ToString("HH:mm:ss")
-                : "noch kein Sync";
-        StorageText.Text = $"Belegt {Fmt.Bytes(st.UsedBytes)} · frei {Fmt.Bytes(st.FreeBytes)} · {sync}";
+                ? L.SyncOk(DateTimeOffset.FromUnixTimeMilliseconds(st.LastSyncAt).LocalDateTime.ToString("HH:mm:ss"))
+                : L.NoSyncYet;
+        StorageText.Text = L.Storage(Fmt.Bytes(st.UsedBytes), Fmt.Bytes(st.FreeBytes), sync);
 
         NowPlayingText.Text = st.NowPlaying is { } np
-            ? $"{(np.Playing ? "▶ Spielt" : "❚❚ Pausiert")}: {np.Title}  ({Fmt.Clock(np.PositionSec)} / {Fmt.Clock(np.DurationSec)})"
-            : "Keine Wiedergabe";
+            ? $"{(np.Playing ? L.Playing : L.Paused)}: {np.Title}  ({Fmt.Clock(np.PositionSec)} / {Fmt.Clock(np.DurationSec)})"
+            : L.NoPlayback;
     }
 
     private void UpdateDownloads(List<WatchDownload> list)
@@ -200,14 +200,14 @@ public partial class MainWindow : Window
 
     private async void RemoveDownload_Click(object sender, RoutedEventArgs e) => await Guard(async () =>
     {
-        if (_watch == null) throw new WatchException("Nicht mit der Uhr verbunden.");
+        if (_watch == null) throw new WatchException(L.NotConnected);
         var rows = DownloadsGrid.SelectedItems.Cast<DownloadRow>().ToList();
         if (rows.Count == 0) return;
         var names = string.Join("\n", rows.Select(r => "• " + r.Title));
-        if (MessageBox.Show(this, $"Von der Uhr entfernen?\n\n{names}", "ShelfWatch",
+        if (MessageBox.Show(this, L.ConfirmRemove(names), "ShelfWatch",
                 MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
         foreach (var r in rows) await _watch.RemoveAsync(r.ItemId);
-        StatusText.Text = $"{rows.Count} Hörbuch/Hörbücher entfernt.";
+        StatusText.Text = L.Removed(rows.Count);
         await PollAsync();
     });
 
@@ -217,26 +217,26 @@ public partial class MainWindow : Window
 
     private async Task AbsLoginAsync()
     {
-        StatusText.Text = "Melde bei Audiobookshelf an…";
+        StatusText.Text = L.SigningIn;
         var used = await _abs.LoginAsync(AbsServer.Text, AbsUser.Text.Trim(), AbsPassword.Password);
         AbsServer.Text = used;
         SaveSettings();
-        AbsStatusText.Text = $"Angemeldet als {AbsUser.Text.Trim()} @ {used}";
+        AbsStatusText.Text = L.SignedInAbs(AbsUser.Text.Trim(), used);
         var libs = await _abs.LibrariesAsync();
         LibraryBox.ItemsSource = libs;
         if (libs.Count > 0) LibraryBox.SelectedIndex = 0;
-        StatusText.Text = $"{libs.Count} Hörbuch-Bibliothek(en) gefunden.";
+        StatusText.Text = L.LibrariesFound(libs.Count);
     }
 
     private async void WatchLogin_Click(object sender, RoutedEventArgs e) => await Guard(async () =>
     {
-        if (_watch == null) throw new WatchException("Zuerst mit der Uhr verbinden.");
+        if (_watch == null) throw new WatchException(L.ConnectFirst);
         var server = _abs.IsLoggedIn ? _abs.Server : AbsServer.Text.Trim();
-        if (server == "" || AbsUser.Text.Trim() == "") throw new AbsException("Server und Benutzer eintragen.");
-        StatusText.Text = "Uhr meldet sich bei Audiobookshelf an…";
+        if (server == "" || AbsUser.Text.Trim() == "") throw new AbsException(L.EnterServerUser);
+        StatusText.Text = L.WatchSigningIn;
         await _watch.LoginAsync(server, AbsUser.Text.Trim(), AbsPassword.Password);
         SaveSettings();
-        StatusText.Text = "Uhr ist angemeldet.";
+        StatusText.Text = L.WatchSignedIn;
         await PollAsync();
     });
 
@@ -253,12 +253,12 @@ public partial class MainWindow : Window
     private async Task LoadPageAsync()
     {
         if (_libraryId == null) return;
-        StatusText.Text = "Lade Bibliothek…";
+        StatusText.Text = L.LoadingLibrary;
         var (items, total) = await _abs.ItemsAsync(_libraryId, _libPage);
         _libPage++;
         _libTotal = total;
         AddBooks(items);
-        LibCountText.Text = $"{_books.Count} von {total}";
+        LibCountText.Text = L.NOfTotal(_books.Count, total);
         MoreBtn.IsEnabled = _books.Count < total;
         StatusText.Text = "";
     }
@@ -267,7 +267,7 @@ public partial class MainWindow : Window
     {
         foreach (var i in items.Where(i => i.MediaType == "book"))
         {
-            var title = i.Media?.Metadata.Title ?? "Unbekannt";
+            var title = i.Media?.Metadata.Title ?? L.Unknown;
             var author = i.Media?.Metadata.AuthorName ?? "";
             _titleCache[i.Id] = (title, author);
             _books.Add(new BookRow
@@ -293,7 +293,7 @@ public partial class MainWindow : Window
 
     private async Task SearchAsync()
     {
-        if (_libraryId == null) throw new AbsException("Zuerst bei Audiobookshelf anmelden.");
+        if (_libraryId == null) throw new AbsException(L.SignInFirst);
         var q = SearchBox.Text.Trim();
         _books.Clear();
         if (q == "")
@@ -304,7 +304,7 @@ public partial class MainWindow : Window
         }
         var results = await _abs.SearchAsync(_libraryId, q);
         AddBooks(results);
-        LibCountText.Text = $"{_books.Count} Treffer";
+        LibCountText.Text = L.Hits(_books.Count);
         MoreBtn.IsEnabled = false;
     }
 
@@ -314,15 +314,15 @@ public partial class MainWindow : Window
 
     private async Task DownloadSelectedAsync()
     {
-        if (_watch == null) throw new WatchException("Zuerst mit der Uhr verbinden.");
+        if (_watch == null) throw new WatchException(L.ConnectFirst);
         var rows = BooksGrid.SelectedItems.Cast<BookRow>().ToList();
         if (rows.Count == 0)
         {
-            StatusText.Text = "Bitte Hörbuch(er) auswählen.";
+            StatusText.Text = L.SelectBooks;
             return;
         }
         foreach (var r in rows) await _watch.EnqueueAsync(r.Id);
-        StatusText.Text = $"{rows.Count} Download(s) an die Uhr gesendet – Fortschritt im Tab „Auf der Uhr“.";
+        StatusText.Text = L.DownloadsSent(rows.Count);
         await PollAsync();
     }
 }
