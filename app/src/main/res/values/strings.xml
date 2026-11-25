@@ -19,7 +19,10 @@
     <string name="libraries">Libraries</string>
     <string name="more">More</string>
     <string name="downloads">Downloads</string>
-    <string name="n_audiobooks">%d audiobooks</string>
+    <plurals name="n_audiobooks">
+        <item quantity="one">%d audiobook</item>
+        <item quantity="other">%d audiobooks</item>
+    </plurals>
     <string name="pc_connection">PC connection</string>
     <string name="state_on">On</string>
     <string name="state_off">Off</string>
@@ -133,4 +136,21 @@
     <string name="err_bad_credentials">Wrong username or password</string>
     <string name="err_server_unreachable">Server unreachable: %s</string>
     <string name="err_no_token">No token received</string>
+
+    <!-- Local audio files -->
+    <string name="local_files">Local audio files</string>
+    <string name="local_files_empty">No files yet. Add MP3 or Opus files from the Windows app.</string>
+    <plurals name="n_local_files">
+        <item quantity="one">%d file</item>
+        <item quantity="other">%d files</item>
+    </plurals>
+    <string name="err_local_type">Only .mp3 and .opus files are allowed</string>
+    <string name="err_length_required">Content-Length missing</string>
+    <string name="err_local_too_large">File too large (max. 2 GB)</string>
+    <string name="err_local_no_space">Not enough free space on the watch</string>
+    <string name="err_local_incomplete">Upload incomplete</string>
+    <string name="err_local_save">File could not be saved</string>
+
+    <!-- Crown volume -->
+    <string name="volume_percent">Volume %d %%</string>
 </resources>

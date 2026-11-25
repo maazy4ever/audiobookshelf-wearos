@@ -258,7 +258,7 @@ class PlaybackService : MediaSessionService() {
                 player.prepare()
                 player.play()
                 // Server-Session für Statistik & Live-Sync öffnen (auch bei lokalen Dateien)
-                Graph.appScope.launch {
+                if (!LocalAudio.isLocalId(itemId)) Graph.appScope.launch {
                     val sid = runCatching { Graph.api.startSession(itemId).id }.getOrNull()
                     withContext(Dispatchers.Main) { if (active === book) book.sessionId = sid }
                 }
@@ -272,7 +272,26 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
+    /** Eigene MP3/Opus-Datei: keine Server-Anbindung, Dauer aus den Datei-Metadaten. */
+    private fun localPlayable(itemId: String): PlayableItem {
+        val name = itemId.removePrefix(LocalAudio.PREFIX)
+        val file = LocalAudio.fileFor(this, name)?.takeIf { it.exists() }
+            ?: throw IOException(str(R.string.err_file_access))
+        val durSec = LocalAudio.durationSec(file)
+        return PlayableItem(
+            itemId = itemId,
+            title = file.nameWithoutExtension,
+            author = "",
+            duration = durSec,
+            tracks = listOf(PlayTrack(Uri.fromFile(file).toString(), durSec)),
+            chapters = emptyList(),
+            coverUri = null,
+            isLocal = true,
+        )
+    }
+
     private suspend fun resolvePlayable(itemId: String): PlayableItem {
+        if (LocalAudio.isLocalId(itemId)) return localPlayable(itemId)
         Graph.downloads.get(itemId)?.let { return Graph.downloads.toPlayable(it) }
         val li = try {
             Graph.api.item(itemId)
@@ -296,6 +315,11 @@ class PlaybackService : MediaSessionService() {
 
     /** Neuerer Stand gewinnt: lokaler (offline gehörter) oder Server-Fortschritt. */
     private suspend fun resolveStartPosition(item: PlayableItem): Double {
+        if (LocalAudio.isLocalId(item.itemId)) {
+            val p = Graph.progress.get(item.itemId) ?: return 0.0
+            return if (p.isFinished || (item.duration > 0 && p.currentTime >= item.duration - 5)) 0.0
+            else p.currentTime.coerceAtLeast(0.0)
+        }
         val local = Graph.progress.get(item.itemId)
         val server = withTimeoutOrNull(8_000) { runCatching { Graph.api.progress(item.itemId) }.getOrNull() }
         val useLocal = local != null && (server == null || local.lastUpdate >= server.lastUpdate)
@@ -305,7 +329,7 @@ class PlaybackService : MediaSessionService() {
             server != null -> server.currentTime to server.isFinished
             else -> 0.0 to false
         }
-        return if (finished || pos >= item.duration - 5) 0.0 else pos.coerceAtLeast(0.0)
+        return if (finished || (item.duration > 0 && pos >= item.duration - 5)) 0.0 else pos.coerceAtLeast(0.0)
     }
 
     /** Alle Audiodateien als eine durchgehende Zeitleiste → Position = ABS-currentTime. */
@@ -338,6 +362,13 @@ class PlaybackService : MediaSessionService() {
         player.clearMediaItems()
     }
 
+    /** Eigene Dateien: nach dem Ende das nächste Lied in der (alphabetischen) Liste starten. */
+    private fun playNextLocal(currentId: String) {
+        val names = LocalAudio.list(this).map { it.first }
+        val next = names.getOrNull(names.indexOf(currentId.removePrefix(LocalAudio.PREFIX)) + 1) ?: return
+        playItem(LocalAudio.idFor(next))
+    }
+
     // --- Player-Events --------------------------------------------------------
 
     private val playerListener = object : Player.Listener {
@@ -362,6 +393,7 @@ class PlaybackService : MediaSessionService() {
                 val a = active ?: return
                 syncNow(closeSession = true)
                 a.sessionId = null
+                if (LocalAudio.isLocalId(a.item.itemId)) playNextLocal(a.item.itemId)
             }
         }
 
@@ -415,11 +447,15 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun currentPositionSec(a: ActiveBook): Double =
-        (player.currentPosition / 1000.0).coerceIn(0.0, a.item.duration)
+        (player.currentPosition / 1000.0).coerceIn(0.0, a.item.duration.takeIf { it > 0 } ?: Double.MAX_VALUE)
 
     private fun saveLocal() {
         val a = active ?: return
-        Graph.progress.put(a.item.itemId, currentPositionSec(a), a.item.duration, player.playbackState == Player.STATE_ENDED)
+        Graph.progress.put(
+            a.item.itemId, currentPositionSec(a), a.item.duration,
+            player.playbackState == Player.STATE_ENDED,
+            dirty = !LocalAudio.isLocalId(a.item.itemId),
+        )
     }
 
     /**
@@ -434,9 +470,11 @@ class PlaybackService : MediaSessionService() {
         val finished = player.playbackState == Player.STATE_ENDED
         val pos = if (finished) duration else currentPositionSec(a)
         val listened = a.takeListenedSec()
-        val stamp = Graph.progress.put(itemId, pos, duration, finished)
+        val stamp = Graph.progress.put(itemId, pos, duration, finished, dirty = !LocalAudio.isLocalId(itemId))
         val sid = a.sessionId
         if (closeSession) a.sessionId = null
+        // Eigene Dateien haben keinen Server-Fortschritt: nur lokal speichern
+        if (LocalAudio.isLocalId(itemId)) return
 
         Graph.appScope.launch {
             syncMutex.withLock {

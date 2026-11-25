@@ -12,12 +12,15 @@ import dev.shelfwatch.data.Auth
 import dev.shelfwatch.data.LoginException
 import dev.shelfwatch.download.DlState
 import dev.shelfwatch.download.DownloadService
+import dev.shelfwatch.playback.LocalAudio
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import java.io.BufferedInputStream
 import java.io.InputStream
+import java.io.OutputStream
 import java.net.Socket
+import java.net.URLDecoder
 import java.util.concurrent.ConcurrentHashMap
 
 @Serializable
@@ -61,6 +64,9 @@ data class CDownload(
 )
 
 @Serializable
+data class CLocalFile(val name: String, val sizeBytes: Long)
+
+@Serializable
 data class CEnqueue(val itemId: String)
 
 @Serializable
@@ -69,12 +75,16 @@ data class CLogin(val server: String, val username: String, val password: String
 @Serializable
 data class CResult(val ok: Boolean, val error: String? = null)
 
+private const val MAX_BODY = 64 * 1024
+private const val MAX_UPLOAD = 2L * 1024 * 1024 * 1024
+/** Mindestens freier Speicher, der nach einem Upload übrig bleiben muss. */
+private const val RESERVE_BYTES = 50L * 1024 * 1024
+
 /**
  * Minimaler HTTP/1.1-Server (JSON, Connection: close) für die Windows-Companion-App.
  * Alle Endpunkte außer /api/hello erfordern den Header `X-ShelfWatch-Pin`.
+ * Dateiuploads (POST /api/local) werden als Binärstream direkt auf die Platte geschrieben.
  */
-private const val MAX_BODY = 64 * 1024
-
 class CompanionApi(private val context: Context, private val onRequest: (String) -> Unit) {
     private val json = Graph.json
     private val failures = ConcurrentHashMap<String, Pair<Int, Long>>()
@@ -84,14 +94,16 @@ class CompanionApi(private val context: Context, private val onRequest: (String)
         Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME) ?: Build.MODEL
 
     fun handle(socket: Socket) {
-        socket.soTimeout = 15_000
+        socket.soTimeout = 30_000
         socket.use { s ->
             val input = BufferedInputStream(s.getInputStream())
             val requestLine = readLine(input) ?: return
             val parts = requestLine.split(' ')
             if (parts.size < 2) return
             val method = parts[0].uppercase()
-            val path = parts[1].substringBefore('?')
+            val target = parts[1]
+            val path = target.substringBefore('?')
+            val query = target.substringAfter('?', "")
             val headers = HashMap<String, String>()
             while (true) {
                 val line = readLine(input) ?: break
@@ -99,37 +111,72 @@ class CompanionApi(private val context: Context, private val onRequest: (String)
                 val i = line.indexOf(':')
                 if (i > 0) headers[line.substring(0, i).trim().lowercase()] = line.substring(i + 1).trim()
             }
+            val ip = s.inetAddress?.hostAddress.orEmpty()
+            val out = s.getOutputStream()
+
+            // Datei-Upload: Body sind Binärdaten, daher nicht als Text lesen
+            if (method == "POST" && path == "/api/local") {
+                val (code, text) = try {
+                    uploadLocal(headers, query, input, ip)
+                } catch (e: Exception) {
+                    400 to err(e.message ?: e.javaClass.simpleName)
+                }
+                writeResponse(out, code, text)
+                return
+            }
+
             val bodyText = if (headers["transfer-encoding"]?.contains("chunked", ignoreCase = true) == true) {
                 readChunked(input)
             } else {
                 val len = headers["content-length"]?.toIntOrNull()?.coerceIn(0, MAX_BODY) ?: 0
                 String(readExactly(input, len), Charsets.UTF_8)
             }
-            val ip = s.inetAddress?.hostAddress.orEmpty()
             val (code, text) = try {
                 route(method, path, headers, bodyText, ip)
             } catch (e: Exception) {
                 400 to err(e.message ?: e.javaClass.simpleName)
             }
-            val bytes = text.toByteArray(Charsets.UTF_8)
-            val out = s.getOutputStream()
-            out.write(
-                ("HTTP/1.1 $code ${reason(code)}\r\n" +
-                    "Content-Type: application/json; charset=utf-8\r\n" +
-                    "Content-Length: ${bytes.size}\r\n" +
-                    "Connection: close\r\n\r\n").toByteArray(Charsets.US_ASCII)
-            )
-            out.write(bytes)
-            out.flush()
+            writeResponse(out, code, text)
         }
+    }
+
+    private fun writeResponse(out: OutputStream, code: Int, text: String) {
+        val bytes = text.toByteArray(Charsets.UTF_8)
+        out.write(
+            ("HTTP/1.1 $code ${reason(code)}\r\n" +
+                "Content-Type: application/json; charset=utf-8\r\n" +
+                "Content-Length: ${bytes.size}\r\n" +
+                "Connection: close\r\n\r\n").toByteArray(Charsets.US_ASCII)
+        )
+        out.write(bytes)
+        out.flush()
     }
 
     private fun route(method: String, path: String, headers: Map<String, String>, body: String, ip: String): Pair<Int, String> {
         if (method == "GET" && path == "/api/hello") {
             return 200 to json.encodeToString(CHello("ShelfWatch", deviceName(), BuildConfig.VERSION_NAME))
         }
+        checkAuth(headers, ip)?.let { return it }
 
-        // --- Code prüfen (mit Sperre nach 5 Fehlversuchen) ---
+        return when {
+            method == "GET" && path == "/api/status" -> 200 to json.encodeToString(status())
+            method == "GET" && path == "/api/downloads" -> 200 to json.encodeToString(downloads())
+            method == "POST" && path == "/api/downloads" -> enqueue(json.decodeFromString<CEnqueue>(body).itemId)
+            method == "DELETE" && path.startsWith("/api/downloads/") -> remove(path.removePrefix("/api/downloads/"))
+            method == "GET" && path == "/api/local" -> 200 to json.encodeToString(localFiles())
+            method == "DELETE" && path.startsWith("/api/local/") ->
+                deleteLocal(URLDecoder.decode(path.removePrefix("/api/local/"), "UTF-8"))
+            method == "POST" && path == "/api/login" -> login(json.decodeFromString(body))
+            method == "POST" && path == "/api/logout" -> {
+                Auth.logout()
+                200 to ok()
+            }
+            else -> 404 to err("Unknown path: $method $path")
+        }
+    }
+
+    /** Prüft den Code mit Sperre nach 5 Fehlversuchen. Liefert null bei Erfolg, sonst die Fehlerantwort. */
+    private fun checkAuth(headers: Map<String, String>, ip: String): Pair<Int, String>? {
         val now = SystemClock.elapsedRealtime()
         val f = failures[ip]
         if (f != null && f.second > now) return 429 to err(str(R.string.err_too_many_attempts))
@@ -140,19 +187,7 @@ class CompanionApi(private val context: Context, private val onRequest: (String)
         }
         failures.remove(ip)
         onRequest(ip)
-
-        return when {
-            method == "GET" && path == "/api/status" -> 200 to json.encodeToString(status())
-            method == "GET" && path == "/api/downloads" -> 200 to json.encodeToString(downloads())
-            method == "POST" && path == "/api/downloads" -> enqueue(json.decodeFromString<CEnqueue>(body).itemId)
-            method == "DELETE" && path.startsWith("/api/downloads/") -> remove(path.removePrefix("/api/downloads/"))
-            method == "POST" && path == "/api/login" -> login(json.decodeFromString(body))
-            method == "POST" && path == "/api/logout" -> {
-                Auth.logout()
-                200 to ok()
-            }
-            else -> 404 to err("Unknown path: $method $path")
-        }
+        return null
     }
 
     private fun status(): CStatus {
@@ -210,6 +245,62 @@ class CompanionApi(private val context: Context, private val onRequest: (String)
         }
     }
 
+    private fun localFiles(): List<CLocalFile> =
+        LocalAudio.list(context).map { CLocalFile(it.first, it.second) }
+
+    /**
+     * Lädt eine MP3/Opus-Datei hoch: POST /api/local?name=<Dateiname>, Body = Rohdaten.
+     * Erfordert Content-Length. Geschrieben wird zuerst als .part, dann umbenannt.
+     */
+    private fun uploadLocal(headers: Map<String, String>, query: String, input: InputStream, ip: String): Pair<Int, String> {
+        // Code vor dem Lesen des Bodys prüfen
+        checkAuth(headers, ip)?.let { return it }
+
+        val name = queryParam(query, "name")?.let { LocalAudio.sanitize(it) }
+            ?: return 400 to err(str(R.string.err_local_type))
+        val length = headers["content-length"]?.toLongOrNull()
+            ?: return 411 to err(str(R.string.err_length_required))
+        if (length <= 0 || length > MAX_UPLOAD) return 413 to err(str(R.string.err_local_too_large))
+        if (length + RESERVE_BYTES > Graph.downloads.freeBytes()) return 507 to err(str(R.string.err_local_no_space))
+
+        val dir = LocalAudio.dir(context)
+        val part = java.io.File(dir, "$name.part")
+        var received = 0L
+        part.outputStream().use { out ->
+            val buf = ByteArray(64 * 1024)
+            while (received < length) {
+                val n = input.read(buf, 0, minOf(buf.size.toLong(), length - received).toInt())
+                if (n < 0) break
+                out.write(buf, 0, n)
+                received += n
+            }
+        }
+        if (received != length) {
+            part.delete()
+            return 400 to err(str(R.string.err_local_incomplete))
+        }
+        val target = java.io.File(dir, name)
+        if (target.exists()) target.delete()
+        if (!part.renameTo(target)) {
+            part.delete()
+            return 500 to err(str(R.string.err_local_save))
+        }
+        onRequest(ip)
+        return 200 to ok()
+    }
+
+    private fun deleteLocal(raw: String): Pair<Int, String> {
+        val file = LocalAudio.fileFor(context, raw) ?: return 400 to err(str(R.string.err_invalid_id))
+        if (file.exists()) file.delete()
+        return 200 to ok()
+    }
+
+    private fun queryParam(query: String, key: String): String? =
+        query.split('&')
+            .firstOrNull { it.substringBefore('=') == key }
+            ?.substringAfter('=', "")
+            ?.let { URLDecoder.decode(it, "UTF-8") }
+
     private fun enqueue(itemId: String): Pair<Int, String> {
         if (!idPattern.matches(itemId)) return 400 to err(str(R.string.err_invalid_id))
         if (!Graph.loggedIn.value) return 409 to err(str(R.string.err_watch_not_signed_in))
@@ -246,7 +337,11 @@ class CompanionApi(private val context: Context, private val onRequest: (String)
         401 -> "Unauthorized"
         404 -> "Not Found"
         409 -> "Conflict"
+        411 -> "Length Required"
+        413 -> "Payload Too Large"
         429 -> "Too Many Requests"
+        500 -> "Internal Server Error"
+        507 -> "Insufficient Storage"
         else -> "Error"
     }
 
@@ -261,7 +356,7 @@ class CompanionApi(private val context: Context, private val onRequest: (String)
         return if (off == len) buf else buf.copyOf(off)
     }
 
-    /** HTTP/1.1 chunked transfer encoding. */
+    /** HTTP/1.1 chunked transfer encoding (für JSON-Anfragen). */
     private fun readChunked(input: InputStream): String {
         val out = java.io.ByteArrayOutputStream()
         while (out.size() <= MAX_BODY) {

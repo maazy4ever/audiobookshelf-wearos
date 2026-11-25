@@ -2,7 +2,6 @@ package dev.shelfwatch.ui
 
 import android.content.Context
 import android.media.AudioManager
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,13 +17,18 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.gestures.ScrollableState
+import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
+import androidx.compose.ui.focus.FocusRequester
+import androidx.wear.compose.foundation.rotary.rotaryScrollable
+import android.util.Log
+import dev.shelfwatch.str
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
@@ -45,10 +49,23 @@ import java.util.Locale
 import kotlin.math.abs
 
 private val SPEEDS = listOf(0.75f, 1f, 1.1f, 1.25f, 1.5f, 1.75f, 2f)
+/** Pixel-Summe, ab der die Krone einen Lautstärkeschritt auslöst (im Log abstimmbar). */
+private const val ROTARY_PX_PER_STEP = 20f
+private const val ROTARY_TAG = "ShelfWatchRotary"
+
+@Composable
+private fun VolumeButton(label: String, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier.size(ButtonDefaults.ExtraSmallButtonSize),
+        colors = ButtonDefaults.secondaryButtonColors(),
+    ) { Text(label, style = MaterialTheme.typography.caption2) }
+}
 
 @Composable
 fun PlayerScreen(vm: MainViewModel) {
     val ps by vm.player.state.collectAsState()
+    val posMs by vm.player.position.collectAsState()
     val now by vm.nowPlaying.collectAsState()
     val loading by vm.playbackLoading.collectAsState()
     val error by vm.playbackError.collectAsState()
@@ -56,38 +73,71 @@ fun PlayerScreen(vm: MainViewModel) {
     val sync by vm.syncStatus.collectAsState()
     val ctx = LocalContext.current
     val audio = remember { ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
-    val focus = remember { FocusRequester() }
-    var rotaryAcc by remember { mutableFloatStateOf(0f) }
+    /** Lautstärke in Prozent, kurz nach dem Drehen angezeigt. */
+    var volumeShown by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(volumeShown) {
+        if (volumeShown != null) {
+            delay(1_500)
+            volumeShown = null
+        }
+    }
 
     val item = now
-    val durSec = item?.duration ?: (ps.durationMs / 1000.0)
-    val posSec = ps.positionMs / 1000.0
+    val durSec = item?.duration?.takeIf { it > 0 } ?: (ps.durationMs / 1000.0)
+    val posSec = posMs / 1000.0
     val fraction = if (durSec > 0) (posSec / durSec).toFloat().coerceIn(0f, 1f) else 0f
     val chapter = item?.chapterAt(posSec)
 
-    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    /** Lautstärke um [steps] Schritte ändern, eigene Anzeige statt System-Overlay. */
+    fun changeVolume(steps: Int) {
+        val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+        val new = (audio.getStreamVolume(AudioManager.STREAM_MUSIC) + steps).coerceIn(0, max)
+        audio.setStreamVolume(AudioManager.STREAM_MUSIC, new, 0)
+        volumeShown = new * 100 / max
+    }
+
+    // Krone: Drehereignisse laufen über den Scroll-Mechanismus von Wear Compose. Der Fokus wird dort
+    // selbst verwaltet; die gelieferten Pixel-Werte summieren sich zu Lautstärkeschritten.
+    var rotaryAcc by remember { mutableFloatStateOf(0f) }
+    val rotaryState = remember {
+        ScrollableState { delta ->
+            Log.d(ROTARY_TAG, "rotary delta=$delta")
+            rotaryAcc += delta
+            val steps = (rotaryAcc / ROTARY_PX_PER_STEP).toInt()
+            if (steps != 0) {
+                rotaryAcc -= steps * ROTARY_PX_PER_STEP
+                changeVolume(steps)
+            }
+            delta
+        }
+    }
+
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        repeat(30) {
+            if (runCatching { focusRequester.requestFocus() }.isSuccess) return@LaunchedEffect
+            delay(100)
+        }
+    }
 
     Scaffold(timeText = { TimeText() }) {
         Box(
             Modifier
                 .fillMaxSize()
-                // Krone = Lautstärke
-                .onRotaryScrollEvent { e ->
-                    rotaryAcc += e.verticalScrollPixels
-                    if (abs(rotaryAcc) > 48f) {
-                        audio.adjustStreamVolume(
-                            AudioManager.STREAM_MUSIC,
-                            if (rotaryAcc > 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER,
-                            AudioManager.FLAG_SHOW_UI,
-                        )
-                        rotaryAcc = 0f
-                    }
-                    true
-                }
-                .focusRequester(focus)
-                .focusable(),
+                .rotaryScrollable(
+                    behavior = RotaryScrollableDefaults.behavior(scrollableState = rotaryState),
+                    focusRequester = focusRequester,
+                ),
             contentAlignment = Alignment.Center,
         ) {
+            volumeShown?.let { pct ->
+                Text(
+                    str(R.string.volume_percent, pct),
+                    style = MaterialTheme.typography.caption2,
+                    color = MaterialTheme.colors.primary,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp),
+                )
+            }
             CircularProgressIndicator(
                 progress = fraction,
                 modifier = Modifier.fillMaxSize().padding(3.dp),
@@ -100,7 +150,7 @@ fun PlayerScreen(vm: MainViewModel) {
                 verticalArrangement = Arrangement.Center,
                 modifier = Modifier.padding(horizontal = 22.dp),
             ) {
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(4.dp))
                 Text(
                     item?.title ?: str(if (loading) R.string.loading else R.string.nothing_selected),
                     style = MaterialTheme.typography.button,
@@ -149,6 +199,8 @@ fun PlayerScreen(vm: MainViewModel) {
                 Spacer(Modifier.height(4.dp))
                 // Sync-Punkt: grün = synchronisiert, orange = ausstehend
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    VolumeButton("−") { changeVolume(-1) }
+                    Spacer(Modifier.width(4.dp))
                     Text(
                         "● ",
                         style = MaterialTheme.typography.caption3,
@@ -162,6 +214,8 @@ fun PlayerScreen(vm: MainViewModel) {
                         "${formatClock(posSec)} / ${formatClock(durSec)}",
                         style = MaterialTheme.typography.caption3,
                     )
+                    Spacer(Modifier.width(4.dp))
+                    VolumeButton("+") { changeVolume(1) }
                 }
                 Spacer(Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {

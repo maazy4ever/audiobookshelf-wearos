@@ -111,6 +111,28 @@
                     </DataGrid>
                 </DockPanel>
             </TabItem>
+            <!-- Local audio files (MP3 / Opus) -->
+            <TabItem Header="{x:Static local:L.TabLocal}">
+                <DockPanel Margin="6">
+                    <WrapPanel DockPanel.Dock="Top">
+                        <Button Content="{x:Static local:L.AddFiles}" Click="AddLocal_Click" FontWeight="SemiBold" />
+                        <Button Content="{x:Static local:L.RemoveSelectedLocal}" Click="RemoveLocal_Click" />
+                        <Button Content="{x:Static local:L.Refresh}" Click="RefreshLocal_Click" />
+                        <TextBlock x:Name="LocalInfoText" VerticalAlignment="Center" Margin="12,0" />
+                    </WrapPanel>
+                    <TextBlock DockPanel.Dock="Top" Margin="0,6,0,6" TextWrapping="Wrap"
+                               Text="{x:Static local:L.LocalHint}" />
+                    <DataGrid x:Name="LocalGrid" AutoGenerateColumns="False" IsReadOnly="True"
+                              CanUserAddRows="False" HeadersVisibility="Column" SelectionMode="Extended"
+                              GridLinesVisibility="Horizontal">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="{x:Static local:L.ColName}" Binding="{Binding Name}" Width="3*" />
+                            <DataGridTextColumn Header="{x:Static local:L.ColType}" Binding="{Binding Type}" Width="80" />
+                            <DataGridTextColumn Header="{x:Static local:L.ColSize}" Binding="{Binding Size}" Width="100" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </TabItem>
         </TabControl>
     </DockPanel>
 </Window>

@@ -59,6 +59,7 @@ fun ShelfWatchUi(vm: MainViewModel, onAlwaysOnChanged: () -> Unit) {
                     composable("downloads") { DownloadsScreen(vm, nav) }
                     composable("settings") { SettingsScreen(vm, onAlwaysOnChanged) }
                     composable("companion") { CompanionScreen() }
+                    composable("local") { LocalFilesScreen(vm, nav) }
                 }
             }
             if (ambient) AmbientOverlay(vm)
@@ -71,6 +72,7 @@ fun ShelfWatchUi(vm: MainViewModel, onAlwaysOnChanged: () -> Unit) {
 fun AmbientOverlay(vm: MainViewModel) {
     val now by vm.nowPlaying.collectAsState()
     val ps by vm.player.state.collectAsState()
+    val posMs by vm.player.position.collectAsState()
     Column(
         Modifier.fillMaxSize().background(Color.Black).padding(24.dp),
         verticalArrangement = Arrangement.Center,
@@ -91,7 +93,7 @@ fun AmbientOverlay(vm: MainViewModel) {
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            val posSec = ps.positionMs / 1000.0
+            val posSec = posMs / 1000.0
             val remainingMin = ((item.duration - posSec) / 60).toLong().coerceAtLeast(0)
             Text(
                 (if (ps.playWhenReady) "▶ " else "❚❚ ") + str(R.string.time_left, (remainingMin / 60).toInt(), (remainingMin % 60).toInt()),

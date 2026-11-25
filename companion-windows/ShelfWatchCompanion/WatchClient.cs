@@ -1,5 +1,7 @@
+using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -17,6 +19,7 @@ public record WatchDownload(
     string ItemId, string Title, string Author, double DurationSec, long SizeBytes,
     string Status, double Progress, string? Error);
 public record WatchResult(bool Ok, string? Error);
+public record WatchLocalFile(string Name, long SizeBytes);
 public record DiscoveredWatch(string App, string Device, string Ip, int Port)
 {
     public override string ToString() => $"{Device} ({Ip})";
@@ -30,15 +33,16 @@ public class WatchClient
     public const int DiscoveryPort = 8766;
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _http;
+    private readonly HttpClient _upload;
 
     public WatchClient(string ip, int port, string pin)
     {
-        _http = new HttpClient
-        {
-            BaseAddress = new Uri($"http://{ip}:{port}/"),
-            Timeout = TimeSpan.FromSeconds(10),
-        };
+        var baseUri = new Uri($"http://{ip}:{port}/");
+        _http = new HttpClient { BaseAddress = baseUri, Timeout = TimeSpan.FromSeconds(10) };
         _http.DefaultRequestHeaders.Add("X-ShelfWatch-Pin", pin);
+        // Uploads können lange dauern – eigener Client ohne Zeitlimit
+        _upload = new HttpClient { BaseAddress = baseUri, Timeout = Timeout.InfiniteTimeSpan };
+        _upload.DefaultRequestHeaders.Add("X-ShelfWatch-Pin", pin);
     }
 
     public Task<WatchHello> HelloAsync() => Send<WatchHello>(HttpMethod.Get, "api/hello");
@@ -49,6 +53,46 @@ public class WatchClient
     public Task LoginAsync(string server, string username, string password) =>
         Send<WatchResult>(HttpMethod.Post, "api/login", new { server, username, password });
     public Task LogoutAsync() => Send<WatchResult>(HttpMethod.Post, "api/logout");
+    public Task<List<WatchLocalFile>> LocalFilesAsync() => Send<List<WatchLocalFile>>(HttpMethod.Get, "api/local");
+    public Task DeleteLocalAsync(string name) =>
+        Send<WatchResult>(HttpMethod.Delete, $"api/local/{Uri.EscapeDataString(name)}");
+
+    /// <summary>Lädt eine MP3/Opus-Datei auf die Uhr. Rohdaten mit Content-Length, damit die Uhr sie direkt speichern kann.</summary>
+    public async Task UploadLocalAsync(string filePath, CancellationToken ct = default)
+    {
+        var name = Path.GetFileName(filePath);
+        await using var fs = File.OpenRead(filePath);
+        using var content = new StreamContent(fs);
+        content.Headers.ContentLength = fs.Length; // explizit, sonst sendet HttpClient "chunked"
+        content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        using var req = new HttpRequestMessage(HttpMethod.Post, $"api/local?name={Uri.EscapeDataString(name)}")
+        {
+            Content = content,
+        };
+        HttpResponseMessage resp;
+        try
+        {
+            resp = await _upload.SendAsync(req, ct);
+        }
+        catch (HttpRequestException e)
+        {
+            throw new WatchException(L.WatchUnreachable(e.Message));
+        }
+        catch (IOException e)
+        {
+            throw new WatchException(L.WatchUnreachable(e.Message));
+        }
+        using (resp)
+        {
+            var text = await resp.Content.ReadAsStringAsync(ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                string? err = null;
+                try { err = JsonSerializer.Deserialize<WatchResult>(text, Json)?.Error; } catch { }
+                throw new WatchException(err ?? $"HTTP {(int)resp.StatusCode}");
+            }
+        }
+    }
 
     private async Task<T> Send<T>(HttpMethod method, string path, object? body = null)
     {

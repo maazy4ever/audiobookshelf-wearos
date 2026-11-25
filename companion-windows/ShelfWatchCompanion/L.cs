@@ -113,4 +113,25 @@ public static class L
     public static string SignInFailed(int code) => T($"Sign-in failed: HTTP {code}", $"Anmeldung fehlgeschlagen: HTTP {code}");
     public static string NoToken => T("No token received", "Kein Token erhalten");
     public static string NotSignedInAbs => T("Not signed in", "Nicht angemeldet");
+
+    // --- Tab: local audio files ---
+    public static string TabLocal => T("Local audio", "Lokale Audio");
+    public static string AddFiles => T("Add files…", "Dateien hinzufügen…");
+    public static string RemoveSelectedLocal => T("Remove selected", "Ausgewählte entfernen");
+    public static string LocalHint => T(
+        "MP3 and Opus files are copied to the watch and play with the watch's media controls (ShelfWatch → Local audio files). They are separate from the audiobook library.",
+        "MP3- und Opus-Dateien werden auf die Uhr kopiert und lassen sich über die Medien-Steuerung der Uhr abspielen (ShelfWatch → Lokale Audiodateien). Sie sind unabhängig von der Hörbuch-Bibliothek.");
+    public static string ColName => T("Name", "Name");
+    public static string ColType => T("Type", "Typ");
+    public static string AudioFiles => T("Audio files", "Audiodateien");
+    public static string ChooseFiles => T("Choose audio files", "Audiodateien auswählen");
+    public static string Uploading(string name, int i, int n) =>
+        T($"Uploading {name} ({i}/{n})…", $"Übertrage {name} ({i}/{n})…");
+    public static string UploadDone(int ok, int n) =>
+        T($"{ok} of {n} file(s) uploaded.", $"{ok} von {n} Datei(en) übertragen.");
+    public static string UploadErrors => T("Some files could not be uploaded:", "Einige Dateien konnten nicht übertragen werden:");
+    public static string ConfirmRemoveLocal(string names) =>
+        T($"Remove from the watch?\n\n{names}", $"Von der Uhr entfernen?\n\n{names}");
+    public static string RemovedLocal(int n) => T($"{n} file(s) removed.", $"{n} Datei(en) entfernt.");
+    public static string LocalCount(int n, string size) => T($"{n} file(s) · {size}", $"{n} Datei(en) · {size}");
 }

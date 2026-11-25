@@ -17,7 +17,10 @@
     <string name="libraries">Bibliotheken</string>
     <string name="more">Mehr</string>
     <string name="downloads">Downloads</string>
-    <string name="n_audiobooks">%d Hörbücher</string>
+    <plurals name="n_audiobooks">
+        <item quantity="one">%d Hörbuch</item>
+        <item quantity="other">%d Hörbücher</item>
+    </plurals>
     <string name="pc_connection">PC-Verbindung</string>
     <string name="state_on">Aktiv</string>
     <string name="state_off">Aus</string>
@@ -131,4 +134,21 @@
     <string name="err_bad_credentials">Benutzername oder Passwort falsch</string>
     <string name="err_server_unreachable">Server nicht erreichbar: %s</string>
     <string name="err_no_token">Kein Token erhalten</string>
+
+    <!-- Lokale Audiodateien -->
+    <string name="local_files">Lokale Audiodateien</string>
+    <string name="local_files_empty">Noch keine Dateien. MP3- oder Opus-Dateien über die Windows-App hinzufügen.</string>
+    <plurals name="n_local_files">
+        <item quantity="one">%d Datei</item>
+        <item quantity="other">%d Dateien</item>
+    </plurals>
+    <string name="err_local_type">Nur .mp3- und .opus-Dateien sind erlaubt</string>
+    <string name="err_length_required">Content-Length fehlt</string>
+    <string name="err_local_too_large">Datei zu groß (max. 2 GB)</string>
+    <string name="err_local_no_space">Nicht genug freier Speicher auf der Uhr</string>
+    <string name="err_local_incomplete">Übertragung unvollständig</string>
+    <string name="err_local_save">Datei konnte nicht gespeichert werden</string>
+
+    <!-- Krone: Lautstärke -->
+    <string name="volume_percent">Lautstärke %d %%</string>
 </resources>

@@ -1,6 +1,7 @@
 package dev.shelfwatch.playback
 
 import android.content.ComponentName
+import dev.shelfwatch.Graph
 import android.content.Context
 import android.os.Bundle
 import androidx.media3.common.C
@@ -26,7 +27,6 @@ class PlayerConnection(private val context: Context, private val tickMs: () -> L
         val isPlaying: Boolean = false,
         val playWhenReady: Boolean = false,
         val buffering: Boolean = false,
-        val positionMs: Long = 0,
         val durationMs: Long = 0,
         val speed: Float = 1f,
         val mediaId: String? = null,
@@ -37,6 +37,10 @@ class PlayerConnection(private val context: Context, private val tickMs: () -> L
     private var controller: MediaController? = null
     private val _state = MutableStateFlow(State())
     val state = _state.asStateFlow()
+
+    /** Wiedergabeposition – separat, damit sich nur die Player-Anzeige alle 500 ms neu zeichnet. */
+    private val _position = MutableStateFlow(0L)
+    val position = _position.asStateFlow()
 
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) = update()
@@ -65,18 +69,30 @@ class PlayerConnection(private val context: Context, private val tickMs: () -> L
     }
 
     private suspend fun ctrl(): MediaController? {
-        connect()
-        return controller ?: future?.let { runCatching { it.await() }.getOrNull() }
+        controller?.takeIf { it.isConnected }?.let { return it }
+        // Verbindung zum Dienst verloren (z. B. vom System beendet, weil die App im Leerlauf war): neu aufbauen
+        controller?.removeListener(listener)
+        controller = null
+        future?.let { MediaController.releaseFuture(it) }
+        future = null
+        val token = SessionToken(context, ComponentName(context, PlaybackService::class.java))
+        val f = MediaController.Builder(context, token).buildAsync()
+        future = f
+        val c = runCatching { f.await() }.getOrNull() ?: return null
+        controller = c
+        c.addListener(listener)
+        update()
+        return c
     }
 
     private fun update() {
         val c = controller ?: return
+        _position.value = c.currentPosition
         _state.value = State(
             connected = true,
             isPlaying = c.isPlaying,
             playWhenReady = c.playWhenReady,
             buffering = c.playbackState == Player.STATE_BUFFERING,
-            positionMs = c.currentPosition,
             durationMs = c.duration.takeIf { it != C.TIME_UNSET } ?: 0L,
             speed = c.playbackParameters.speed,
             mediaId = c.currentMediaItem?.mediaId,
@@ -99,6 +115,11 @@ class PlayerConnection(private val context: Context, private val tickMs: () -> L
     fun togglePlay() {
         scope.launch {
             val c = ctrl() ?: return@launch
+            if (c.currentMediaItem == null) {
+                // Dienst war beendet: Hörbuch neu laden, Position wird aus dem Fortschritt wiederhergestellt
+                Graph.nowPlaying.value?.let { playItem(it.itemId) }
+                return@launch
+            }
             if (c.playWhenReady && c.playbackState != Player.STATE_ENDED) {
                 c.pause()
             } else {

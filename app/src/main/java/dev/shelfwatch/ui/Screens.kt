@@ -41,6 +41,12 @@ import dev.shelfwatch.str
 import dev.shelfwatch.companion.CompanionService
 import dev.shelfwatch.data.LibraryItem
 import dev.shelfwatch.download.DlState
+import dev.shelfwatch.playback.LocalAudio
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.res.pluralStringResource
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 // --- Login -------------------------------------------------------------------
 
@@ -153,7 +159,23 @@ fun HomeScreen(vm: MainViewModel, nav: NavHostController) {
                 onClick = { nav.navigate("downloads") },
                 icon = { Icon(painterResource(R.drawable.ic_download), contentDescription = null) },
                 label = { Text(str(R.string.downloads)) },
-                secondaryLabel = { Text(str(R.string.n_audiobooks, downloads.values.count { it.complete })) },
+                secondaryLabel = {
+                    val n = downloads.values.count { it.complete }
+                    Text(pluralStringResource(R.plurals.n_audiobooks, n, n))
+                },
+                colors = ChipDefaults.secondaryChipColors(),
+            )
+        }
+        item {
+            val localCount by produceState(0) {
+                value = withContext(Dispatchers.IO) { LocalAudio.list(Graph.app).size }
+            }
+            Chip(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { nav.navigate("local") },
+                icon = { Icon(painterResource(R.drawable.ic_music), contentDescription = null) },
+                label = { Text(str(R.string.local_files)) },
+                secondaryLabel = { Text(pluralStringResource(R.plurals.n_local_files, localCount, localCount)) },
                 colors = ChipDefaults.secondaryChipColors(),
             )
         }
@@ -202,9 +224,13 @@ fun HomeScreen(vm: MainViewModel, nav: NavHostController) {
 fun SyncLine(vm: MainViewModel) {
     val status by vm.syncStatus.collectAsState()
     val pending by vm.pendingSync.collectAsState()
-    val ps by vm.player.state.collectAsState()
-    // alle ~5 s neu berechnen, damit "vor x s" aktuell bleibt
-    val now = remember(ps.positionMs / 5000, status) { System.currentTimeMillis() }
+    // alle 5 s neu berechnen, damit "vor x s" aktuell bleibt (ohne Abhängigkeit vom Player)
+    val now by produceState(System.currentTimeMillis()) {
+        while (true) {
+            delay(5_000)
+            value = System.currentTimeMillis()
+        }
+    }
     val text = when {
         pending > 0 -> str(R.string.sync_pending, pending, formatAgo(status.lastSuccessAt, now))
         status.lastSuccessAt > 0 -> str(R.string.sync_ok, formatAgo(status.lastSuccessAt, now))
@@ -439,10 +465,13 @@ fun DownloadsScreen(vm: MainViewModel, nav: NavHostController) {
             ) { nav.navigate("item/${d.itemId}") }
         }
         item {
-            val used = remember(downloads) { Graph.downloads.usedBytes() }
-            val free = remember(downloads) { Graph.downloads.freeBytes() }
+            // Speicher-Scan im Hintergrund statt im Bildaufbau
+            var storage by remember { mutableStateOf(0L to 0L) }
+            LaunchedEffect(downloads) {
+                storage = withContext(Dispatchers.IO) { Graph.downloads.usedBytes() to Graph.downloads.freeBytes() }
+            }
             Text(
-                str(R.string.storage, formatBytes(used), formatBytes(free)),
+                str(R.string.storage, formatBytes(storage.first), formatBytes(storage.second)),
                 style = MaterialTheme.typography.caption3,
                 textAlign = TextAlign.Center,
             )

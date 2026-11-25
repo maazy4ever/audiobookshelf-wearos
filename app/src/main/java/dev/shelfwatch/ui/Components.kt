@@ -10,6 +10,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -107,8 +109,10 @@ fun BookChip(row: BookRow, onClick: () -> Unit) {
 
 @Composable
 fun Cover(itemId: String, modifier: Modifier = Modifier) {
-    val local = Graph.downloads.coverFile(itemId)
-    val model: Any = if (local.exists()) local else Graph.api.coverUrl(itemId, 160)
+    // Kein Dateizugriff bei jeder Neuzeichnung: Der Download-Status steht im Speicher
+    val downloads by Graph.downloads.items.collectAsState()
+    val cached = downloads[itemId]?.hasCover == true
+    val model: Any = if (cached) Graph.downloads.coverFile(itemId) else Graph.api.coverUrl(itemId, 160)
     AsyncImage(
         model = model,
         contentDescription = null,

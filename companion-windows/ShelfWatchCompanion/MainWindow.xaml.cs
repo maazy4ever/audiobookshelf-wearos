@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -13,6 +14,7 @@ public partial class MainWindow : Window
     private WatchClient? _watch;
     private readonly ObservableCollection<DownloadRow> _downloads = new();
     private readonly ObservableCollection<BookRow> _books = new();
+    private readonly ObservableCollection<LocalRow> _local = new();
     /// <summary>Titel/Autor aus der Bibliothek – für Downloads, deren Metadaten die Uhr noch nicht kennt.</summary>
     private readonly Dictionary<string, (string title, string author)> _titleCache = new();
     private Dictionary<string, WatchDownload> _watchState = new();
@@ -26,6 +28,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         DownloadsGrid.ItemsSource = _downloads;
         BooksGrid.ItemsSource = _books;
+        LocalGrid.ItemsSource = _local;
 
         WatchIp.Text = _settings.WatchIp;
         WatchPort.Text = _settings.WatchPort.ToString();
@@ -122,6 +125,8 @@ public partial class MainWindow : Window
         StatusText.Text = L.ConnectedWatch;
         _timer.Start();
         await PollAsync();
+        try { await RefreshLocalAsync(); }
+        catch (WatchException) { /* ältere Uhr-Version ohne Dateiliste – ignorieren */ }
     }
 
     private async Task PollAsync()
@@ -209,6 +214,68 @@ public partial class MainWindow : Window
         foreach (var r in rows) await _watch.RemoveAsync(r.ItemId);
         StatusText.Text = L.Removed(rows.Count);
         await PollAsync();
+    });
+
+    // --- Lokale Audiodateien (MP3 / Opus) ------------------------------------
+
+    private async Task RefreshLocalAsync()
+    {
+        if (_watch == null) return;
+        var files = await _watch.LocalFilesAsync();
+        _local.Clear();
+        foreach (var f in files)
+            _local.Add(new LocalRow(f.Name, Path.GetExtension(f.Name).TrimStart('.').ToUpperInvariant(), Fmt.Bytes(f.SizeBytes)));
+        LocalInfoText.Text = L.LocalCount(files.Count, Fmt.Bytes(files.Sum(f => f.SizeBytes)));
+    }
+
+    private async void RefreshLocal_Click(object sender, RoutedEventArgs e) => await Guard(RefreshLocalAsync);
+
+    private async void AddLocal_Click(object sender, RoutedEventArgs e) => await Guard(async () =>
+    {
+        if (_watch == null) throw new WatchException(L.ConnectFirst);
+        var dlg = new Microsoft.Win32.OpenFileDialog
+        {
+            Multiselect = true,
+            Title = L.ChooseFiles,
+            Filter = $"{L.AudioFiles} (*.mp3;*.opus)|*.mp3;*.opus",
+        };
+        if (dlg.ShowDialog(this) != true) return;
+
+        var files = dlg.FileNames;
+        var uploaded = 0;
+        var errors = new List<string>();
+        for (var i = 0; i < files.Length; i++)
+        {
+            var name = Path.GetFileName(files[i]);
+            StatusText.Text = L.Uploading(name, i + 1, files.Length);
+            try
+            {
+                await _watch.UploadLocalAsync(files[i]);
+                uploaded++;
+            }
+            catch (Exception ex) when (ex is WatchException or IOException)
+            {
+                errors.Add($"{name}: {ex.Message}");
+            }
+        }
+        StatusText.Text = L.UploadDone(uploaded, files.Length);
+        if (errors.Count > 0)
+            MessageBox.Show(this, L.UploadErrors + "\n\n" + string.Join("\n", errors), "ShelfWatch",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        await RefreshLocalAsync();
+    });
+
+    private async void RemoveLocal_Click(object sender, RoutedEventArgs e) => await Guard(async () =>
+    {
+        if (_watch == null) throw new WatchException(L.ConnectFirst);
+        var rows = LocalGrid.SelectedItems.Cast<LocalRow>().ToList();
+        if (rows.Count == 0) return;
+        var names = string.Join("\n", rows.Select(r => "• " + r.Name));
+        if (MessageBox.Show(this, L.ConfirmRemoveLocal(names), "ShelfWatch",
+                MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        foreach (var r in rows) await _watch.DeleteLocalAsync(r.Name);
+        StatusText.Text = L.RemovedLocal(rows.Count);
+        await RefreshLocalAsync();
     });
 
     // --- Audiobookshelf ------------------------------------------------------

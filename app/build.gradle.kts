@@ -42,8 +42,11 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = if (!keystoreProps.isEmpty) signingConfigs.getByName("release")
-            else signingConfigs.getByName("debug")
+            isShrinkResources = false
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // -PdebugSigned: Release-Build mit Debug-Schlüssel (Test auf der Uhr ohne Neuinstallation)
+            signingConfig = if (!keystoreProps.isEmpty && !project.hasProperty("debugSigned"))
+                signingConfigs.getByName("release") else signingConfigs.getByName("debug")
         }
     }
     buildFeatures {

@@ -38,9 +38,9 @@ class ProgressStore(context: Context, private val json: Json) {
 
     /** Speichert Fortschritt als „dirty“ und liefert die Versionsmarke zurück. */
     @Synchronized
-    fun put(itemId: String, currentTime: Double, duration: Double, isFinished: Boolean): Long {
+    fun put(itemId: String, currentTime: Double, duration: Double, isFinished: Boolean, dirty: Boolean = true): Long {
         val stamp = maxOf(System.currentTimeMillis(), lastStamp + 1).also { lastStamp = it }
-        save(itemId, LocalProgress(currentTime, duration, isFinished, stamp, dirty = true))
+        save(itemId, LocalProgress(currentTime, duration, isFinished, stamp, dirty = dirty))
         return stamp
     }
 
